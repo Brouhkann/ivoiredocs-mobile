@@ -20,8 +20,24 @@ export const AUTH_ERROR_CODES = {
   PHONE_NOT_REGISTERED: 'PHONE_NOT_REGISTERED',
   WRONG_PASSWORD: 'WRONG_PASSWORD',
   PHONE_ALREADY_REGISTERED: 'PHONE_ALREADY_REGISTERED',
+  NETWORK_ERROR: 'NETWORK_ERROR',
   UNKNOWN_ERROR: 'UNKNOWN_ERROR',
 } as const;
+
+// Fonction helper pour détecter les erreurs réseau
+function isNetworkError(error: any): boolean {
+  if (!error) return false;
+  const message = error.message?.toLowerCase() || '';
+  return (
+    message.includes('network') ||
+    message.includes('fetch') ||
+    message.includes('connection') ||
+    message.includes('timeout') ||
+    message.includes('unable to resolve') ||
+    error.code === 'ECONNABORTED' ||
+    error.code === 'ENOTFOUND'
+  );
+}
 
 interface AuthState {
   user: User | null;
@@ -61,12 +77,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (error) {
         console.error("Erreur vérification téléphone:", error);
+        if (isNetworkError(error)) {
+          throw new AuthError(
+            "Erreur de connexion internet. Vérifiez votre connexion et réessayez.",
+            AUTH_ERROR_CODES.NETWORK_ERROR
+          );
+        }
         return false;
       }
 
       return data !== null;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur vérification téléphone:", error);
+      if (error instanceof AuthError) throw error;
+      if (isNetworkError(error)) {
+        throw new AuthError(
+          "Erreur de connexion internet. Vérifiez votre connexion et réessayez.",
+          AUTH_ERROR_CODES.NETWORK_ERROR
+        );
+      }
       return false;
     }
   },
@@ -98,6 +127,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw new AuthError(
           "Mot de passe incorrect",
           AUTH_ERROR_CODES.WRONG_PASSWORD
+        );
+      }
+      if (isNetworkError(error)) {
+        throw new AuthError(
+          "Erreur de connexion internet. Vérifiez votre connexion et réessayez.",
+          AUTH_ERROR_CODES.NETWORK_ERROR
         );
       }
       throw new AuthError(
@@ -162,6 +197,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw new AuthError(
           "Ce numéro de téléphone est déjà enregistré. Veuillez vous connecter.",
           AUTH_ERROR_CODES.PHONE_ALREADY_REGISTERED
+        );
+      }
+      if (isNetworkError(error)) {
+        throw new AuthError(
+          "Erreur de connexion internet. Vérifiez votre connexion et réessayez.",
+          AUTH_ERROR_CODES.NETWORK_ERROR
         );
       }
       throw new AuthError(
