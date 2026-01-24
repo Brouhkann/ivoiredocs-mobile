@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude install:*)",
+      "Bash(claude --version:*)",
+      "Bash(npm run android:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls:*)",
+      "Bash(gh auth status:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

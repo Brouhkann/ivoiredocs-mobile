@@ -1,20 +1,25 @@
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { PaperProvider } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { theme } from './src/config/theme';
+import RootNavigator from './src/navigation/RootNavigator';
+import { useAuthStore } from './src/stores/authStore';
 
 export default function App() {
+  const initializeAuth = useAuthStore((state) => state.initializeAuth);
+
+  // Initialiser l'authentification au démarrage
+  useEffect(() => {
+    initializeAuth();
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <SafeAreaProvider>
+      <PaperProvider theme={theme}>
+        <StatusBar style="auto" />
+        <RootNavigator />
+      </PaperProvider>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
