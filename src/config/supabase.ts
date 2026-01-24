@@ -1,55 +1,20 @@
 import { createClient } from "@supabase/supabase-js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Récupération des variables d'environnement avec trim pour éviter les espaces
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim();
+// Valeurs Supabase en dur pour garantir le fonctionnement en production
+// Les variables d'environnement ne sont pas fiables dans les builds APK
+const supabaseUrl = "https://ahxdrdmwkpnregganmfh.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoeGRyZG13a3BucmVnZ2FubWZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU4NDY5NzEsImV4cCI6MjA3MTQyMjk3MX0.pKQvj1v3OZrh4qpDg89_wCMLblFespNu3jyXdK1GVbk";
 
-// Debug détaillé en mode développement
+// Debug en mode développement
 if (__DEV__) {
-  console.log("🔍 Debug Supabase Config:");
-  console.log("process.env keys:", Object.keys(process.env).filter(k => k.startsWith('EXPO')));
-  console.log("URL:", supabaseUrl ? "✓ Loaded" : "✗ Missing");
-  console.log("URL Value:", supabaseUrl);
-  console.log("Key:", supabaseAnonKey ? "✓ Loaded" : "✗ Missing");
-  console.log("Key Length:", supabaseAnonKey?.length || 0);
-  if (supabaseAnonKey) {
-    console.log("Key Preview:", `${supabaseAnonKey.substring(0, 20)}...${supabaseAnonKey.substring(supabaseAnonKey.length - 20)}`);
-  }
-}
-
-// Vérification stricte des variables d'environnement
-if (!supabaseUrl || !supabaseAnonKey) {
-  const errorMsg = "⚠️ ERREUR CRITIQUE: Variables Supabase manquantes!";
-  console.error(errorMsg);
-  console.error("URL présente:", !!supabaseUrl);
-  console.error("Key présente:", !!supabaseAnonKey);
-  console.error("");
-  console.error("📝 Solution:");
-  console.error("1. Vérifiez que le fichier .env existe à la racine du projet");
-  console.error("2. Vérifiez qu'il contient:");
-  console.error("   EXPO_PUBLIC_SUPABASE_URL=votre_url");
-  console.error("   EXPO_PUBLIC_SUPABASE_ANON_KEY=votre_cle");
-  console.error("3. Redémarrez le serveur Metro: npx expo start -c");
-  console.error("");
-}
-
-// Utiliser les valeurs directement sans fallback
-const finalUrl = supabaseUrl || "https://placeholder.supabase.co";
-const finalKey = supabaseAnonKey || "placeholder-key";
-
-// Vérification de la validité de l'URL
-try {
-  new URL(finalUrl);
-  if (__DEV__ && supabaseUrl) {
-    console.log("✅ URL Supabase valide");
-  }
-} catch (e) {
-  console.error("❌ URL Supabase invalide:", finalUrl);
+  console.log("🔍 Supabase Config:");
+  console.log("URL:", supabaseUrl);
+  console.log("Key Length:", supabaseAnonKey.length);
 }
 
 // Configuration du client Supabase avec AsyncStorage
-export const supabase = createClient(finalUrl, finalKey, {
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
@@ -57,11 +22,6 @@ export const supabase = createClient(finalUrl, finalKey, {
     detectSessionInUrl: false,
   },
 });
-
-// Log de confirmation en dev
-if (__DEV__) {
-  console.log("✅ Client Supabase initialisé");
-}
 
 // Types Supabase générés automatiquement
 export type Database = {
