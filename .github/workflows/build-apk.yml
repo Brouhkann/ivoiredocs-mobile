@@ -38,26 +38,29 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Setup Expo
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Install Expo CLI
+        run: npm install -g expo-cli @expo/ngrok
 
       - name: Generate native Android project
-        run: npx expo prebuild -p android --clean
+        run: npx expo prebuild -p android --clean --no-install
 
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      - name: Build APK
+      - name: Install Android dependencies
         working-directory: android
-        run: ./gradlew assembleRelease
+        run: |
+          chmod +x gradlew
+          ./gradlew dependencies
+
+      - name: Build APK Release
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Rename APK
+        run: |
+          mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/ivoiredocs-v${{ github.run_number }}.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ivoiredocs-apk
-          path: android/app/build/outputs/apk/release/*.apk
-          retention-days: 30
+          name: ivoiredocs-apk-v${{ github.run_number }}
+          path: android/app/build/outputs/apk/release/ivoiredocs-*.apk
+          retention-days: 90
