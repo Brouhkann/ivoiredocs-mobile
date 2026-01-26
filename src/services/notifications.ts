@@ -13,21 +13,16 @@ interface SMSProvider {
   send(to: string, message: string): Promise<boolean>;
 }
 
-// Configuration des providers
+// Configuration des providers SMS via variables d'environnement
+// IMPORTANT: Ne jamais hardcoder les credentials dans le code source
 const SMS_PROVIDERS = {
   orangeCI: {
     baseUrl:
       "https://api.orange.com/smsmessaging/v1/outbound/tel%3A%2B2250000/requests",
     tokenUrl: "https://api.orange.com/oauth/v2/token",
-    clientId:
-      process.env.EXPO_PUBLIC_ORANGE_CLIENT_ID ||
-      "MBantq4e2bfd0byeviMzk61Wuv0rZ1vG",
-    clientSecret:
-      process.env.EXPO_PUBLIC_ORANGE_CLIENT_SECRET ||
-      "TXalK5Z52tC7rsTBYep8KqyW0Ht88VOVtzmHuIp7Untm",
-    authHeader:
-      process.env.EXPO_PUBLIC_ORANGE_AUTH_HEADER ||
-      "Basic TUJhbnRxNGUyYmZkMGJ5ZXZpTXprNjFXdXYwcloxdkc6VFhhbEs1WjUydEM3cnNUQlllcDhLcXlXMEh0ODhWT1Z0em1IdUlwN1VudG0=",
+    clientId: process.env.EXPO_PUBLIC_ORANGE_CLIENT_ID || "",
+    clientSecret: process.env.EXPO_PUBLIC_ORANGE_CLIENT_SECRET || "",
+    authHeader: process.env.EXPO_PUBLIC_ORANGE_AUTH_HEADER || "",
   },
   infobip: {
     baseUrl: "https://api.infobip.com/sms/2/text/advanced",

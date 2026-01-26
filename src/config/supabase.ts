@@ -1,10 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Valeurs Supabase en dur pour garantir le fonctionnement en production
-// Les variables d'environnement ne sont pas fiables dans les builds APK
-const supabaseUrl = "https://ahxdrdmwkpnregganmfh.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFoeGRyZG13a3BucmVnZ2FubWZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU4NDY5NzEsImV4cCI6MjA3MTQyMjk3MX0.pKQvj1v3OZrh4qpDg89_wCMLblFespNu3jyXdK1GVbk";
+// Configuration Supabase via variables d'environnement
+// Les valeurs sont injectées au build time via le fichier .env
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error("⚠️ SUPABASE_URL ou SUPABASE_ANON_KEY non configurés!");
+}
 
 // Debug en mode développement
 if (__DEV__) {
