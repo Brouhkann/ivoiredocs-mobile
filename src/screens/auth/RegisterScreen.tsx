@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { Text, TextInput, Button, Card } from 'react-native-paper';
 import { useAuthStore, AuthError, AUTH_ERROR_CODES } from '../../stores/authStore';
 import { toast } from '../../stores/toastStore';
@@ -114,6 +114,11 @@ export default function RegisterScreen({ navigation, route }: any) {
     >
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
+          <Image
+            source={require('../../../assets/logo-dark.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text variant="displaySmall" style={styles.title}>
             Inscription
           </Text>
@@ -235,6 +240,11 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginBottom: 32,
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: 16,
   },
   title: {
     color: '#10b981',

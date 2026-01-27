@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabase';
 import { Linking } from 'react-native';
+import { assignDelegateToRequest } from './delegateAssignmentService';
 
 /**
  * Service de paiement Wave (manuel avec liens WhatsApp)
@@ -168,7 +169,7 @@ export async function getPendingInvoices(): Promise<Invoice[]> {
 export async function confirmPayment(
   invoiceId: string,
   waveTransactionId?: string
-): Promise<{ success: boolean; request_id?: string; error?: string }> {
+): Promise<{ success: boolean; request_id?: string; delegate_assigned?: boolean; delegate_id?: string; error?: string }> {
   try {
     // 1. Récupérer la facture
     const { data: invoice, error: fetchError } = await supabase
@@ -223,7 +224,24 @@ export async function confirmPayment(
 
     if (updateError) throw updateError;
 
-    return { success: true, request_id: request.id };
+    // 4. Assigner automatiquement un délégué à la demande
+    console.log('🎯 Assignation automatique du délégué...');
+    const assignmentResult = await assignDelegateToRequest(request.id);
+
+    if (assignmentResult.success) {
+      console.log('✅ Délégué assigné avec succès:', assignmentResult.delegateId);
+    } else {
+      // L'assignation a échoué mais le paiement est confirmé
+      // La demande reste en status 'new' et pourra être assignée manuellement
+      console.warn('⚠️ Assignation délégué échouée:', assignmentResult.error);
+    }
+
+    return {
+      success: true,
+      request_id: request.id,
+      delegate_assigned: assignmentResult.success,
+      delegate_id: assignmentResult.delegateId
+    };
   } catch (error: any) {
     console.error('Erreur confirmation paiement:', error);
     return { success: false, error: error.message };
