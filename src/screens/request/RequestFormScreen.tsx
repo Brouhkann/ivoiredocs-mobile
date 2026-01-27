@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
 import { Text, TextInput, Button as PaperButton, Divider, RadioButton } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,6 +31,7 @@ export default function RequestFormScreen({ route, navigation }: any) {
 
   // Étape courante (1 ou 2)
   const [currentStep, setCurrentStep] = useState(1);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // État du formulaire - Étape 1
   const [city, setCity] = useState('');
@@ -206,6 +207,10 @@ export default function RequestFormScreen({ route, navigation }: any) {
       return;
     }
     setCurrentStep(2);
+    // Scroll en haut de la page
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }, 100);
   };
 
   const handleSubmit = () => {
@@ -273,7 +278,7 @@ export default function RequestFormScreen({ route, navigation }: any) {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent}>
           {/* ÉTAPE 1 : Informations du document */}
           {currentStep === 1 && (
             <>
@@ -632,7 +637,7 @@ export default function RequestFormScreen({ route, navigation }: any) {
           {currentStep === 2 && (
             <>
               {/* Bouton Retour */}
-              <TouchableOpacity onPress={() => setCurrentStep(1)} style={styles.backToStep1}>
+              <TouchableOpacity onPress={() => { setCurrentStep(1); scrollViewRef.current?.scrollTo({ y: 0, animated: true }); }} style={styles.backToStep1}>
                 <Ionicons name="arrow-back" size={20} color="#047857" />
                 <Text style={styles.backToStep1Text}>Retour aux informations</Text>
               </TouchableOpacity>
@@ -682,7 +687,7 @@ export default function RequestFormScreen({ route, navigation }: any) {
                   activeOutlineColor="#047857"
                 />
                 {deliveryData.ville_destination && isAbidjanCommune(deliveryData.ville_destination) && (
-                  <Text style={styles.infoText}>ℹ️ Cette commune fait partie d'Abidjan - Livraison express disponible</Text>
+                  <Text style={styles.infoText}>ℹ️ Livraison express disponible pour {deliveryData.ville_destination}</Text>
                 )}
               </SectionCard>
 
@@ -899,7 +904,11 @@ export default function RequestFormScreen({ route, navigation }: any) {
         <TextInput label="Nom complet *" value={formData.nom_complet || ''} onChangeText={(v) => setFormData({ ...formData, nom_complet: v })} mode="outlined" style={styles.input} placeholder="Nom et prénoms complets" outlineColor="#e5e7eb" activeOutlineColor="#047857" />
         <TextInput label="Numéro d'acte de naissance *" value={formData.numero_acte_naissance || ''} onChangeText={(v) => setFormData({ ...formData, numero_acte_naissance: v })} mode="outlined" style={styles.input} outlineColor="#e5e7eb" activeOutlineColor="#047857" />
         {documentType === 'extrait_acte_naissance' && (
-          <View style={styles.mariageCheckbox}>
+          <TouchableOpacity
+            style={styles.mariageCheckbox}
+            onPress={() => setFormData({ ...formData, en_vue_mariage: formData.en_vue_mariage === 'true' ? 'false' : 'true' })}
+            activeOpacity={0.7}
+          >
             <View style={styles.goldAccent} />
             <View style={styles.checkboxRow}>
               <RadioButton.Android
@@ -910,7 +919,7 @@ export default function RequestFormScreen({ route, navigation }: any) {
               />
               <Text style={styles.checkboxLabel}>💍 En vue de mariage</Text>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
       </SectionCard>
     );

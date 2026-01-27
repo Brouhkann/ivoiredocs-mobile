@@ -30,7 +30,7 @@ export default function PhotoUploader({ onImagesChange }: PhotoUploaderProps) {
         Pièces justificatives (optionnel)
       </Text>
       <Text variant="bodySmall" style={styles.subtitle}>
-        Ajoutez jusqu'à 5 photos de vos documents justificatifs
+        1 photo suffit (5 maximum)
       </Text>
 
       {/* Prévisualisation des images */}

@@ -65,7 +65,7 @@ export function captureSingleDocumentBillingDetails(
   } else if (isEtablissementAbidjan && !isDestinationAbidjan) {
     if (moyenRecuperation === "moi_meme_gare") {
       fraisExpedition = moyenExpedition === "utb" ? 1000 * totalCopies : 1000;
-      const moyenText = moyenExpedition === 'utb' ? 'UTB' : 'autre compagnie de transport';
+      const moyenText = moyenExpedition === 'utb' ? 'UTB' : (deliveryData["preference_transport"] || 'autre compagnie');
       const villeEtabFormatted = city.charAt(0).toUpperCase() + city.slice(1).toLowerCase();
       let villeDestFormatted = villeDestination.charAt(0).toUpperCase() + villeDestination.slice(1).toLowerCase();
 
@@ -78,7 +78,7 @@ export function captureSingleDocumentBillingDetails(
   } else if (!isEtablissementAbidjan && isDestinationAbidjan) {
     if (moyenRecuperation === "moi_meme_gare") {
       fraisExpedition = moyenExpedition === "utb" ? 1000 * totalCopies : 1000;
-      const moyenText = moyenExpedition === 'utb' ? 'UTB' : 'autre compagnie de transport';
+      const moyenText = moyenExpedition === 'utb' ? 'UTB' : (deliveryData["preference_transport"] || 'autre compagnie');
       const villeEtabFormatted = city.charAt(0).toUpperCase() + city.slice(1).toLowerCase();
       let villeDestFormatted = villeDestination.charAt(0).toUpperCase() + villeDestination.slice(1).toLowerCase();
 
@@ -89,7 +89,7 @@ export function captureSingleDocumentBillingDetails(
       expeditionDescription = `Expédition de ${villeEtabFormatted} à ${villeDestFormatted} par ${moyenText}`;
     } else if (moyenRecuperation === "livraison_express") {
       fraisExpedition = moyenExpedition === "utb" ? 1000 * totalCopies : 1000;
-      const moyenText = moyenExpedition === 'utb' ? 'UTB' : 'autre compagnie de transport';
+      const moyenText = moyenExpedition === 'utb' ? 'UTB' : (deliveryData["preference_transport"] || 'autre compagnie');
       const villeEtabFormatted = city.charAt(0).toUpperCase() + city.slice(1).toLowerCase();
       let villeDestFormatted = villeDestination.charAt(0).toUpperCase() + villeDestination.slice(1).toLowerCase();
 
@@ -113,7 +113,7 @@ export function captureSingleDocumentBillingDetails(
         expeditionDescription = `Expédition de ${villeEtabFormatted} à ${villeDestFormatted} par expédition par Abidjan`;
       } else {
         fraisExpedition = moyenExpedition === "utb" ? 1000 * totalCopies : 1000;
-        const moyenText = moyenExpedition === 'utb' ? 'UTB' : 'autre compagnie de transport';
+        const moyenText = moyenExpedition === 'utb' ? 'UTB' : (deliveryData["preference_transport"] || 'autre compagnie');
         const villeEtabFormatted = city.charAt(0).toUpperCase() + city.slice(1).toLowerCase();
         let villeDestFormatted = villeDestination.charAt(0).toUpperCase() + villeDestination.slice(1).toLowerCase();
 
@@ -136,7 +136,7 @@ export function captureSingleDocumentBillingDetails(
         expeditionDescription = `Expédition de ${villeEtabFormatted} à ${villeDestFormatted} par expédition par Abidjan`;
       } else {
         fraisExpedition = moyenExpedition === "utb" ? 1000 * totalCopies : 1000;
-        const moyenText = moyenExpedition === 'utb' ? 'UTB' : 'autre compagnie de transport';
+        const moyenText = moyenExpedition === 'utb' ? 'UTB' : (deliveryData["preference_transport"] || 'autre compagnie');
         const villeEtabFormatted = city.charAt(0).toUpperCase() + city.slice(1).toLowerCase();
         let villeDestFormatted = villeDestination.charAt(0).toUpperCase() + villeDestination.slice(1).toLowerCase();
 
