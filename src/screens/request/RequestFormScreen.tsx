@@ -25,7 +25,15 @@ function isAbidjanCommune(ville: string): boolean {
 }
 
 export default function RequestFormScreen({ route, navigation }: any) {
-  const { documentType } = route.params as { documentType: DocumentType };
+  const { documentType, prefillData } = route.params as {
+    documentType: DocumentType;
+    prefillData?: {
+      city?: string;
+      service_type?: string;
+      copies?: number;
+      form_data?: Record<string, any>;
+    };
+  };
   const documentConfig = DOCUMENT_CONFIGS[documentType];
   const { user, profile } = useAuthStore();
 
@@ -60,6 +68,27 @@ export default function RequestFormScreen({ route, navigation }: any) {
   useEffect(() => {
     loadAvailableCities();
   }, []);
+
+  // Pré-remplir les données si modification d'une demande existante
+  useEffect(() => {
+    if (prefillData) {
+      if (prefillData.city) setCity(prefillData.city);
+      if (prefillData.service_type) setServiceAdmin(prefillData.service_type);
+      if (prefillData.copies) setCopies(prefillData.copies);
+      if (prefillData.form_data) {
+        // Séparer les données du formulaire et les données de livraison
+        const { nom_destinataire, contact1, contact2, mode_livraison, ...rest } = prefillData.form_data;
+        setFormData(rest);
+        setDeliveryData({
+          nom_destinataire: nom_destinataire || '',
+          contact1: contact1 || '',
+          contact2: contact2 || '',
+          mode_livraison: mode_livraison || 'retrait',
+        });
+      }
+      toast.success('Formulaire pré-rempli avec vos données');
+    }
+  }, [prefillData]);
 
   const loadAvailableCities = async () => {
     try {

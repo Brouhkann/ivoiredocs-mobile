@@ -56,11 +56,11 @@ export default function InvoiceActionScreen({ route, navigation }: any) {
     );
   };
 
-  // Modifier la demande (refaire une nouvelle demande)
+  // Modifier la demande (pré-remplir le formulaire)
   const handleModifyRequest = () => {
     Alert.alert(
       'Modifier la demande',
-      'Pour modifier votre demande, nous allons annuler celle-ci et vous rediriger vers le formulaire. Continuer ?',
+      'Vous allez être redirigé vers le formulaire avec vos informations pré-remplies. Continuer ?',
       [
         { text: 'Non', style: 'cancel' },
         {
@@ -69,13 +69,27 @@ export default function InvoiceActionScreen({ route, navigation }: any) {
             try {
               setLoading(true);
               await cancelInvoice(invoice.id);
-              toast.success('Demande annulée');
-              // Rediriger vers la sélection de document
+
+              // Récupérer les données de la demande depuis la facture
+              const requestData = invoice.metadata?.request_data;
+
+              // Rediriger vers le formulaire avec les données pré-remplies
               navigation.reset({
                 index: 0,
                 routes: [
                   { name: 'Main' },
-                  { name: 'DocumentSelection' },
+                  {
+                    name: 'RequestForm',
+                    params: {
+                      documentType: invoice.metadata?.document_type,
+                      prefillData: {
+                        city: invoice.metadata?.city,
+                        service_type: invoice.metadata?.service_type,
+                        copies: invoice.metadata?.copies,
+                        form_data: requestData?.form_data,
+                      }
+                    }
+                  },
                 ],
               });
             } catch (error) {
