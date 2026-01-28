@@ -9,9 +9,9 @@
     "newArchEnabled": true,
     "scheme": "ivoiredocs",
     "splash": {
-      "image": "./assets/logo-dark.png",
+      "image": "./assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#10b981"
     },
     "assetBundlePatterns": [
       "**/*"
