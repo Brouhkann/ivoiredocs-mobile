@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Linking, Image } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Linking, Image, Alert } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { toast } from '../../stores/toastStore';
 import Loading from '../../components/ui/Loading';
 import { supabase } from '../../config/supabase';
-import { type Invoice } from '../../services/wavePaymentService';
+import { type Invoice, cancelInvoice } from '../../services/wavePaymentService';
 
 const WAVE_PAYMENT_BASE_URL = 'https://pay.wave.com/m/M_ci_i7JxKIwiaf99/c/ci/?amount=';
 
@@ -23,6 +23,69 @@ export default function InvoiceActionScreen({ route, navigation }: any) {
     } catch (error) {
       toast.error("Impossible d'ouvrir Wave");
     }
+  };
+
+  // Supprimer/Annuler la facture
+  const handleDeleteInvoice = () => {
+    Alert.alert(
+      'Annuler la demande',
+      'Êtes-vous sûr de vouloir annuler cette demande ? Cette action est irréversible.',
+      [
+        { text: 'Non', style: 'cancel' },
+        {
+          text: 'Oui, annuler',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const success = await cancelInvoice(invoice.id);
+              if (success) {
+                toast.success('Demande annulée');
+                navigation.goBack();
+              } else {
+                toast.error('Erreur lors de l\'annulation');
+              }
+            } catch (error) {
+              toast.error('Erreur lors de l\'annulation');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Modifier la demande (refaire une nouvelle demande)
+  const handleModifyRequest = () => {
+    Alert.alert(
+      'Modifier la demande',
+      'Pour modifier votre demande, nous allons annuler celle-ci et vous rediriger vers le formulaire. Continuer ?',
+      [
+        { text: 'Non', style: 'cancel' },
+        {
+          text: 'Oui, modifier',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await cancelInvoice(invoice.id);
+              toast.success('Demande annulée');
+              // Rediriger vers la sélection de document
+              navigation.reset({
+                index: 0,
+                routes: [
+                  { name: 'Main' },
+                  { name: 'DocumentSelection' },
+                ],
+              });
+            } catch (error) {
+              toast.error('Erreur');
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Sélectionner depuis la galerie
@@ -215,6 +278,19 @@ export default function InvoiceActionScreen({ route, navigation }: any) {
                 <Text style={styles.submitBtnText}>Envoyer la preuve</Text>
               </TouchableOpacity>
             )}
+
+            {/* Actions supplémentaires */}
+            <View style={styles.extraActions}>
+              <TouchableOpacity style={styles.modifyBtn} onPress={handleModifyRequest}>
+                <Ionicons name="create-outline" size={18} color="#3b82f6" />
+                <Text style={styles.modifyBtnText}>Modifier la demande</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.deleteBtn} onPress={handleDeleteInvoice}>
+                <Ionicons name="trash-outline" size={18} color="#ef4444" />
+                <Text style={styles.deleteBtnText}>Annuler la demande</Text>
+              </TouchableOpacity>
+            </View>
           </>
         )}
 
@@ -420,5 +496,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1e40af',
     lineHeight: 22,
+  },
+  extraActions: {
+    marginTop: 24,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    gap: 12,
+  },
+  modifyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eff6ff',
+    borderRadius: 12,
+    padding: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  modifyBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#3b82f6',
+  },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    padding: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  deleteBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#ef4444',
   },
 });
