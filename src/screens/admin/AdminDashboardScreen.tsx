@@ -547,12 +547,12 @@ export default function AdminDashboardScreen({ navigation }: any) {
               <Text style={styles.actionSubLabel}>Rapports</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionCard} onPress={() => toast.info('Section Notifications - À venir')}>
-              <View style={[styles.actionIcon, { backgroundColor: '#fecaca' }]}>
-                <Ionicons name="notifications" size={28} color="#dc2626" />
+            <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('DelegateDotations')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#fef3c7' }]}>
+                <Ionicons name="wallet" size={28} color="#f59e0b" />
               </View>
-              <Text style={styles.actionLabel}>Notifications</Text>
-              <Text style={styles.actionSubLabel}>SMS</Text>
+              <Text style={styles.actionLabel}>Dotations</Text>
+              <Text style={styles.actionSubLabel}>Délégués</Text>
             </TouchableOpacity>
           </View>
         </View>

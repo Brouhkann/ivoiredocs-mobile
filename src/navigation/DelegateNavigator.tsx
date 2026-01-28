@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import DelegateDashboardScreen from '../screens/delegate/DelegateDashboardScreen';
 import DelegateRequestDetailScreen from '../screens/delegate/DelegateRequestDetailScreen';
+import DelegateEarningsScreen from '../screens/delegate/DelegateEarningsScreen';
 import DelegateProfileScreen from '../screens/delegate/DelegateProfileScreen';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -15,6 +16,7 @@ function MissionsStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="DelegateDashboard" component={DelegateDashboardScreen} />
       <Stack.Screen name="DelegateRequestDetail" component={DelegateRequestDetailScreen} />
+      <Stack.Screen name="DelegateEarnings" component={DelegateEarningsScreen} />
     </Stack.Navigator>
   );
 }

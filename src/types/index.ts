@@ -109,6 +109,9 @@ export interface Request {
   total_amount: number;
   delegate_earnings: number;
   delegate_dotation?: number; // Dotation calculée et figée en base de données
+  delegate_payment_status?: 'pending' | 'paid'; // Statut du paiement de la dotation
+  delegate_payment_proof_url?: string; // URL de la preuve de paiement
+  delegate_paid_at?: string; // Date du paiement de la dotation
   document_price?: number;
   service_price?: number;
   shipping_price?: number;

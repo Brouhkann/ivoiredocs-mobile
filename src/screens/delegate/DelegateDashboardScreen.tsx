@@ -530,6 +530,23 @@ export default function DelegateDashboardScreen({ navigation }: any) {
               </Text>
             </View>
           </View>
+
+          {/* Bouton Dotations */}
+          <TouchableOpacity
+            style={styles.earningsButton}
+            onPress={() => navigation.navigate('DelegateEarnings')}
+          >
+            <View style={styles.earningsButtonIcon}>
+              <Ionicons name="wallet" size={22} color="#047857" />
+            </View>
+            <View style={styles.earningsButtonContent}>
+              <Text style={styles.earningsButtonTitle}>Mes dotations</Text>
+              <Text style={styles.earningsButtonSubtitle}>
+                {stats.totalEarnings.toLocaleString()} FCFA
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#047857" />
+          </TouchableOpacity>
         </View>
 
         {/* Onglets */}
@@ -1022,6 +1039,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     color: '#111827',
+  },
+  earningsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#d1fae5',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 16,
+    borderWidth: 2,
+    borderColor: '#a7f3d0',
+  },
+  earningsButtonIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  earningsButtonContent: {
+    flex: 1,
+  },
+  earningsButtonTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#047857',
+  },
+  earningsButtonSubtitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+    marginTop: 2,
   },
   statCardLarge: {
     flex: 1,
