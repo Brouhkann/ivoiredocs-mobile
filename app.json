@@ -9,7 +9,7 @@
     "newArchEnabled": true,
     "scheme": "ivoiredocs",
     "splash": {
-      "image": "./assets/logo.png",
+      "image": "./assets/logo-dark.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
