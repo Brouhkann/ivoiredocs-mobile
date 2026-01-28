@@ -308,6 +308,10 @@ export default function DelegateDotationsScreen({ navigation }: any) {
 
               <View style={styles.dotationDetails}>
                 <View style={styles.detailRow}>
+                  <Ionicons name="receipt" size={14} color="#047857" />
+                  <Text style={styles.detailTextBold}>Demande #{item.id.substring(0, 8).toUpperCase()}</Text>
+                </View>
+                <View style={styles.detailRow}>
                   <Ionicons name="document-text" size={14} color="#6b7280" />
                   <Text style={styles.detailText}>{item.document_type} • {item.city}</Text>
                 </View>
@@ -573,6 +577,11 @@ const styles = StyleSheet.create({
   detailText: {
     fontSize: 13,
     color: '#6b7280',
+  },
+  detailTextBold: {
+    fontSize: 13,
+    color: '#047857',
+    fontWeight: '700',
   },
   paidBadge: {
     flexDirection: 'row',

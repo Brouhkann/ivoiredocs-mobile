@@ -201,6 +201,7 @@ export default function DelegateEarningsScreen({ navigation }: any) {
             >
               <View style={styles.earningHeader}>
                 <View>
+                  <Text style={styles.earningRef}>Demande #{item.id.substring(0, 8).toUpperCase()}</Text>
                   <Text style={styles.earningDoc}>{item.document_type}</Text>
                   <Text style={styles.earningCity}>{item.city}</Text>
                 </View>
@@ -392,6 +393,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
+  },
+  earningRef: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#047857',
+    marginBottom: 2,
   },
   earningDoc: {
     fontSize: 16,
