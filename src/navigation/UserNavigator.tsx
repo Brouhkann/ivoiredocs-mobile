@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import DashboardScreen from '../screens/user/DashboardScreen';
 import ProfileScreen from '../screens/user/ProfileScreen';
 import RequestDetailScreen from '../screens/user/RequestDetailScreen';
+import InvoiceActionScreen from '../screens/user/InvoiceActionScreen';
 import DocumentSelectionScreen from '../screens/request/DocumentSelectionScreen';
 import RequestFormScreen from '../screens/request/RequestFormScreen';
 import PaymentScreen from '../screens/request/PaymentScreen';
@@ -52,6 +53,7 @@ export default function UserNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Main" component={MainTabs} />
       <Stack.Screen name="RequestDetail" component={RequestDetailScreen} />
+      <Stack.Screen name="InvoiceAction" component={InvoiceActionScreen} />
       <Stack.Screen name="DocumentSelection" component={DocumentSelectionScreen} />
       <Stack.Screen name="RequestForm" component={RequestFormScreen} />
       <Stack.Screen name="Payment" component={PaymentScreen} />

@@ -8,7 +8,22 @@
       "Bash(ls:*)",
       "Bash(gh auth status:*)",
       "Bash(gh repo create:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Application mobile Ivoiredocs complète\n\n- Authentification par téléphone \\(pas d''email\\)\n- Demandes de documents administratifs\n- Paiement Wave \\(workflow manuel via WhatsApp\\)\n- Dashboard utilisateur, délégué et admin\n- Gestion des villes et services\n- Tracking des villes demandées non disponibles\n- GitHub Actions pour build APK automatique\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(npx expo:*)",
+      "Bash(npx eas:*)",
+      "Bash(git commit:*)",
+      "Bash(gh run list:*)",
+      "Bash(adb devices:*)",
+      "Bash(adb logcat:*)",
+      "Bash(findstr:*)",
+      "Bash(Select-String -Pattern \".\")",
+      "Bash(Select-Object -Last 100)",
+      "Bash(gh run view:*)",
+      "Bash(gh repo edit:*)",
+      "Bash(gh secret set:*)",
+      "Bash(gh workflow run:*)"
     ]
   }
 }

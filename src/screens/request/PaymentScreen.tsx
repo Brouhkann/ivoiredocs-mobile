@@ -213,11 +213,20 @@ export default function PaymentScreen({ route, navigation }: any) {
             </View>
           </View>
 
+          {/* Image Wave - Moyen de paiement */}
+          <View style={styles.waveImageContainer}>
+            <Image
+              source={require('../../../assets/wave-button.png')}
+              style={styles.waveImage}
+              resizeMode="contain"
+            />
+          </View>
+
           {/* Instructions courtes */}
           <View style={styles.instructionCard}>
             <View style={styles.instructionStep}>
               <View style={styles.stepBadge}><Text style={styles.stepNum}>1</Text></View>
-              <Text style={styles.stepText}>Cliquez sur "Payer avec Wave"</Text>
+              <Text style={styles.stepText}>Cliquez sur "Payer"</Text>
             </View>
             <View style={styles.instructionStep}>
               <View style={styles.stepBadge}><Text style={styles.stepNum}>2</Text></View>
@@ -229,18 +238,10 @@ export default function PaymentScreen({ route, navigation }: any) {
             </View>
           </View>
 
-          {/* Bouton Wave avec image */}
-          <TouchableOpacity style={styles.waveBtn} onPress={handlePayWithWave}>
-            <Image
-              source={require('../../../assets/wave-button.png')}
-              style={styles.waveBtnImage}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-
-          {/* Lien alternatif */}
-          <TouchableOpacity style={styles.linkBtn} onPress={() => setStep('confirmation')}>
-            <Text style={styles.linkBtnText}>J'ai déjà payé → Ajouter la preuve</Text>
+          {/* Bouton Payer */}
+          <TouchableOpacity style={styles.payBtn} onPress={handlePayWithWave}>
+            <Ionicons name="wallet-outline" size={22} color="#fff" />
+            <Text style={styles.payBtnText}>Payer</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -440,29 +441,41 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  waveBtn: {
+  waveImageContainer: {
+    backgroundColor: '#fff',
     borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 16,
-    elevation: 4,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  waveBtnImage: {
+  waveImage: {
     width: '100%',
-    height: 70,
+    height: 80,
   },
 
-  linkBtn: {
+  payBtn: {
+    backgroundColor: '#047857',
+    borderRadius: 16,
+    padding: 18,
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    justifyContent: 'center',
+    gap: 10,
+    elevation: 4,
+    shadowColor: '#047857',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
   },
-  linkBtnText: {
-    color: '#047857',
-    fontSize: 14,
-    fontWeight: '600',
+  payBtnText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
   },
 
   // Page 2 - Confirmation

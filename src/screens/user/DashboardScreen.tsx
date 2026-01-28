@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, SectionList, RefreshControl, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { Text, FAB, Avatar } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,10 +10,32 @@ import StatsCard from '../../components/ui/StatsCard';
 import AppHeader from '../../components/AppHeader';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { getUserInvoices, type Invoice } from '../../services/wavePaymentService';
 
 export default function DashboardScreen({ navigation }: any) {
-  const { profile } = useAuthStore();
+  const { profile, user } = useAuthStore();
   const { requests, loading, refreshing, refresh } = useRequests();
+  const [pendingInvoices, setPendingInvoices] = useState<Invoice[]>([]);
+
+  // Récupérer les factures en attente
+  const fetchPendingInvoices = useCallback(async () => {
+    if (!user?.id) return;
+    const invoices = await getUserInvoices(user.id);
+    // Filtrer les factures en attente (pending ou pending_verification)
+    const pending = invoices.filter(inv =>
+      inv.status === 'pending' || inv.status === 'pending_verification'
+    );
+    setPendingInvoices(pending);
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchPendingInvoices();
+  }, [fetchPendingInvoices]);
+
+  // Rafraîchir aussi les factures lors du refresh
+  const handleRefresh = async () => {
+    await Promise.all([refresh(), fetchPendingInvoices()]);
+  };
 
   // Calculer les statistiques
   const stats = useMemo(() => {
@@ -123,6 +145,62 @@ export default function DashboardScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
+            {/* Section Factures en attente */}
+            {pendingInvoices.length > 0 && (
+              <View style={styles.pendingSection}>
+                <Text variant="titleMedium" style={styles.sectionTitle}>
+                  Factures en attente
+                </Text>
+                {pendingInvoices.map((invoice) => (
+                  <TouchableOpacity
+                    key={invoice.id}
+                    style={styles.invoiceCard}
+                    onPress={() => navigation.navigate('InvoiceAction', { invoice })}
+                  >
+                    <View style={styles.invoiceHeader}>
+                      <View style={styles.invoiceIconContainer}>
+                        <Ionicons
+                          name={invoice.status === 'pending' ? 'wallet-outline' : 'time-outline'}
+                          size={24}
+                          color={invoice.status === 'pending' ? '#f59e0b' : '#3b82f6'}
+                        />
+                      </View>
+                      <View style={styles.invoiceInfo}>
+                        <Text style={styles.invoiceRef}>{invoice.reference}</Text>
+                        <Text style={styles.invoiceDoc}>
+                          {invoice.metadata?.document_type} • {invoice.metadata?.city}
+                        </Text>
+                      </View>
+                      <Text style={styles.invoiceAmount}>
+                        {invoice.amount.toLocaleString()} F
+                      </Text>
+                    </View>
+                    <View style={styles.invoiceActions}>
+                      {invoice.status === 'pending' ? (
+                        <View style={styles.invoiceStatusBadge}>
+                          <Ionicons name="alert-circle" size={14} color="#f59e0b" />
+                          <Text style={styles.invoiceStatusText}>En attente de paiement</Text>
+                        </View>
+                      ) : (
+                        <View style={[styles.invoiceStatusBadge, { backgroundColor: '#dbeafe' }]}>
+                          <Ionicons name="hourglass" size={14} color="#3b82f6" />
+                          <Text style={[styles.invoiceStatusText, { color: '#3b82f6' }]}>
+                            Preuve en vérification
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.invoiceActionBtn}>
+                        <Text style={styles.invoiceActionText}>
+                          {invoice.status === 'pending' ? 'Payer / Preuve' : 'Voir'}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={16} color="#047857" />
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
             {/* Titre de la liste */}
             <View style={styles.listHeader}>
               <Text variant="titleMedium" style={styles.sectionTitle}>
@@ -150,7 +228,7 @@ export default function DashboardScreen({ navigation }: any) {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={refresh}
+            onRefresh={handleRefresh}
             colors={['#047857']}
             tintColor="#047857"
           />
@@ -286,5 +364,87 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
+  },
+  // Factures en attente
+  pendingSection: {
+    padding: 16,
+    paddingTop: 8,
+  },
+  invoiceCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: '#f59e0b',
+  },
+  invoiceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  invoiceIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fef3c7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  invoiceInfo: {
+    flex: 1,
+  },
+  invoiceRef: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  invoiceDoc: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  invoiceAmount: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#047857',
+  },
+  invoiceActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    paddingTop: 12,
+  },
+  invoiceStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 5,
+  },
+  invoiceStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#f59e0b',
+  },
+  invoiceActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  invoiceActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#047857',
   },
 });
