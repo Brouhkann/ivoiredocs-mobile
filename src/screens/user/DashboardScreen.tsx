@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, SectionList, RefreshControl, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { Text, FAB, Avatar } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuthStore } from '../../stores/authStore';
 import { useRequests } from '../../hooks/useRequests';
 import Loading from '../../components/ui/Loading';
@@ -28,9 +29,12 @@ export default function DashboardScreen({ navigation }: any) {
     setPendingInvoices(pending);
   }, [user?.id]);
 
-  useEffect(() => {
-    fetchPendingInvoices();
-  }, [fetchPendingInvoices]);
+  // Rafraîchir les factures à chaque fois que l'écran est visible
+  useFocusEffect(
+    useCallback(() => {
+      fetchPendingInvoices();
+    }, [fetchPendingInvoices])
+  );
 
   // Rafraîchir aussi les factures lors du refresh
   const handleRefresh = async () => {
