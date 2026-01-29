@@ -339,12 +339,19 @@ export async function confirmPayment(
  */
 export async function cancelInvoice(invoiceId: string): Promise<boolean> {
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('invoices')
-      .update({ status: 'cancelled' })
-      .eq('id', invoiceId);
+      .delete()
+      .eq('id', invoiceId)
+      .select();
 
-    return !error;
+    if (error) {
+      console.error('Erreur annulation facture:', error);
+      return false;
+    }
+
+    console.log('Facture supprimée:', data);
+    return true;
   } catch (error) {
     console.error('Erreur annulation facture:', error);
     return false;

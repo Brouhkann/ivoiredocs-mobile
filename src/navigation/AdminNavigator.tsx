@@ -18,6 +18,7 @@ import AnalyticsScreen from '../screens/admin/AnalyticsScreen';
 import RequestDetailScreen from '../screens/user/RequestDetailScreen';
 import PaymentsManagementScreen from '../screens/admin/PaymentsManagementScreen';
 import DelegateDotationsScreen from '../screens/admin/DelegateDotationsScreen';
+import CitySetupScreen from '../screens/admin/CitySetupScreen';
 import { Ionicons } from '@expo/vector-icons';
 
 const Tab = createBottomTabNavigator();
@@ -77,6 +78,7 @@ export default function AdminNavigator() {
       <Stack.Screen name="RequestDetail" component={RequestDetailScreen} />
       <Stack.Screen name="PaymentsManagement" component={PaymentsManagementScreen} />
       <Stack.Screen name="DelegateDotations" component={DelegateDotationsScreen} />
+      <Stack.Screen name="CitySetup" component={CitySetupScreen} />
     </Stack.Navigator>
   );
 }

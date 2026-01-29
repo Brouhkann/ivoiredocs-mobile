@@ -557,6 +557,23 @@ export default function AdminDashboardScreen({ navigation }: any) {
           </View>
         </View>
 
+        {/* Bouton configuration ville */}
+        <TouchableOpacity
+          style={styles.citySetupButton}
+          onPress={() => navigation.navigate('CitySetup')}
+        >
+          <View style={styles.citySetupIcon}>
+            <Ionicons name="add-circle" size={28} color="#fff" />
+          </View>
+          <View style={styles.citySetupContent}>
+            <Text style={styles.citySetupTitle}>Configurer une nouvelle ville</Text>
+            <Text style={styles.citySetupSubtitle}>
+              Ville + Services + Tarifs + Délégué en une seule étape
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="#047857" />
+        </TouchableOpacity>
+
         {/* Administration */}
         <View style={styles.adminSection}>
           <Text style={styles.sectionTitle}>Administration</Text>
@@ -1032,5 +1049,45 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  // Bouton configuration ville
+  citySetupButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 16,
+    padding: 16,
+    elevation: 3,
+    shadowColor: '#047857',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    borderWidth: 2,
+    borderColor: '#d1fae5',
+  },
+  citySetupIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#047857',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  citySetupContent: {
+    flex: 1,
+  },
+  citySetupTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#047857',
+    marginBottom: 2,
+  },
+  citySetupSubtitle: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
   },
 });
