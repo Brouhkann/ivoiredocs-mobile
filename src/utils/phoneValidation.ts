@@ -38,38 +38,60 @@ export function isValidIvorianPhone(phone: string): boolean {
 }
 
 /**
- * Normalise un numéro de téléphone au format +225XXXXXXXXXX
+ * Normalise un numéro de téléphone au format international ivoirien
+ * Format: +225 suivi des 10 chiffres (total 14 caractères)
+ * Exemple: 0505000000 -> +2250505000000
  */
 export function normalizePhone(phone: string): string {
-  // Nettoyer le numéro
+  // Nettoyer le numéro (retirer espaces, tirets, points, parenthèses)
   let cleaned = phone.replace(/[\s\-\.\(\)]/g, '');
+
+  // Si déjà au format +2250XXXXXXXX (14 chars), garder tel quel
+  if (cleaned.startsWith('+2250') && cleaned.length === 14) {
+    return cleaned;
+  }
+
+  // Si format +225XXXXXXXX sans le 0 (13 chars), ajouter le 0
+  if (cleaned.startsWith('+225') && cleaned.length === 13 && cleaned[4] !== '0') {
+    return '+2250' + cleaned.substring(4);
+  }
 
   // Si commence par +225, garder tel quel
   if (cleaned.startsWith('+225')) {
     return cleaned;
   }
 
-  // Si commence par 225, ajouter +
-  if (cleaned.startsWith('225')) {
+  // Si commence par 2250 (sans +), ajouter +
+  if (cleaned.startsWith('2250') && cleaned.length === 13) {
     return '+' + cleaned;
   }
 
-  // Si commence par 0, remplacer par +225
-  if (cleaned.startsWith('0')) {
-    return '+225' + cleaned.substring(1);
+  // Si commence par 225 sans le 0 (12 chars), ajouter +225 et le 0
+  if (cleaned.startsWith('225') && cleaned.length === 12) {
+    return '+2250' + cleaned.substring(3);
   }
 
-  // Sinon, ajouter +225
+  // Si commence par 0 (format local ivoirien 10 chiffres)
+  if (cleaned.startsWith('0') && cleaned.length === 10) {
+    return '+225' + cleaned;
+  }
+
+  // Si 9 chiffres sans le 0, ajouter +2250
+  if (cleaned.length === 9 && /^\d+$/.test(cleaned)) {
+    return '+2250' + cleaned;
+  }
+
+  // Par défaut, ajouter +225
   return '+225' + cleaned;
 }
 
 /**
- * Formate un numéro pour l'affichage: +225 XX XX XX XX XX
+ * Formate un numéro pour l'affichage: +225 05 05 00 00 00
  */
 export function formatPhoneForDisplay(phone: string): string {
   const normalized = normalizePhone(phone);
 
-  // +225 XX XX XX XX XX
+  // +2250505000000 = 14 caractères -> +225 05 05 00 00 00
   if (normalized.length === 14) {
     return `${normalized.slice(0, 4)} ${normalized.slice(4, 6)} ${normalized.slice(6, 8)} ${normalized.slice(8, 10)} ${normalized.slice(10, 12)} ${normalized.slice(12, 14)}`;
   }

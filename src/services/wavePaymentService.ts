@@ -22,9 +22,10 @@ export interface Invoice {
   user_id: string;
   request_id: string | null;
   amount: number;
-  status: 'pending' | 'paid' | 'expired' | 'cancelled';
+  status: 'pending' | 'pending_verification' | 'paid' | 'expired' | 'cancelled';
   payment_method: 'wave' | null;
   wave_transaction_id: string | null;
+  payment_proof_url: string | null;
   created_at: string;
   paid_at: string | null;
   expires_at: string;
@@ -145,9 +146,30 @@ export async function getUserInvoices(userId: string): Promise<Invoice[]> {
 }
 
 /**
- * Récupère les factures en attente de paiement (pour l'admin)
+ * Récupère les factures en attente de validation par l'admin
+ * Statuts: 'pending_verification' = preuve uploadée, en attente de validation
  */
 export async function getPendingInvoices(): Promise<Invoice[]> {
+  try {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .in('status', ['pending_verification'])
+      .not('payment_proof_url', 'is', null)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Erreur récupération factures en attente:', error);
+    return [];
+  }
+}
+
+/**
+ * Récupère toutes les factures en attente (avec ou sans preuve) - pour debug/admin avancé
+ */
+export async function getAllPendingInvoices(): Promise<Invoice[]> {
   try {
     const { data, error } = await supabase
       .from('invoices')
@@ -158,8 +180,72 @@ export async function getPendingInvoices(): Promise<Invoice[]> {
     if (error) throw error;
     return data || [];
   } catch (error) {
-    console.error('Erreur récupération factures en attente:', error);
+    console.error('Erreur récupération factures:', error);
     return [];
+  }
+}
+
+/**
+ * Upload la preuve de paiement pour une facture
+ */
+export async function uploadPaymentProof(
+  invoiceId: string,
+  proofUri: string
+): Promise<{ success: boolean; proofUrl?: string; error?: string }> {
+  try {
+    // Générer un nom de fichier unique
+    const fileExt = proofUri.split('.').pop() || 'jpg';
+    const fileName = `payment_proofs/${invoiceId}_${Date.now()}.${fileExt}`;
+
+    // Lire le fichier et l'uploader
+    const response = await fetch(proofUri);
+    const blob = await response.blob();
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('documents')
+      .upload(fileName, blob, {
+        contentType: `image/${fileExt}`,
+        upsert: true,
+      });
+
+    if (uploadError) throw uploadError;
+
+    // Mettre à jour la facture avec l'URL de la preuve
+    const { error: updateError } = await supabase
+      .from('invoices')
+      .update({ payment_proof_url: fileName })
+      .eq('id', invoiceId);
+
+    if (updateError) throw updateError;
+
+    return { success: true, proofUrl: fileName };
+  } catch (error: any) {
+    console.error('Erreur upload preuve:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Rejette une facture (paiement non valide)
+ */
+export async function rejectPayment(
+  invoiceId: string,
+  reason?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from('invoices')
+      .update({
+        status: 'cancelled',
+      })
+      .eq('id', invoiceId);
+
+    if (error) throw error;
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Erreur rejet paiement:', error);
+    return { success: false, error: error.message };
   }
 }
 

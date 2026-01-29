@@ -1,33 +1,37 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  TextInput,
   Modal,
   Alert,
+  Image,
+  Dimensions,
 } from 'react-native';
-import { Text, Badge } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { toast } from '../../stores/toastStore';
+import { supabase } from '../../config/supabase';
 import {
   getPendingInvoices,
   confirmPayment,
-  cancelInvoice,
-  openWhatsAppToClient,
+  rejectPayment,
   type Invoice,
 } from '../../services/wavePaymentService';
+import Loading from '../../components/ui/Loading';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 export default function PaymentsManagementScreen({ navigation }: any) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [waveLink, setWaveLink] = useState('');
-  const [waveTransactionId, setWaveTransactionId] = useState('');
+  const [proofImageUrl, setProofImageUrl] = useState<string | null>(null);
+  const [showProofModal, setShowProofModal] = useState(false);
   const [processing, setProcessing] = useState(false);
 
   const loadInvoices = useCallback(async (isRefresh = false) => {
@@ -39,75 +43,108 @@ export default function PaymentsManagementScreen({ navigation }: any) {
       setInvoices(data);
     } catch (error) {
       console.error('Erreur chargement factures:', error);
-      toast.error('Erreur lors du chargement des factures');
+      toast.error('Erreur lors du chargement');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadInvoices();
-  }, [loadInvoices]);
+  useFocusEffect(
+    useCallback(() => {
+      loadInvoices();
+    }, [])
+  );
 
-  // Envoyer le lien Wave au client via WhatsApp
-  const handleSendWaveLink = (invoice: Invoice) => {
-    if (!waveLink.trim()) {
-      toast.error('Veuillez entrer le lien Wave');
+  // Voir la preuve de paiement
+  const handleViewProof = async (invoice: Invoice) => {
+    if (!invoice.payment_proof_url) {
+      toast.error('Aucune preuve de paiement');
       return;
     }
-    openWhatsAppToClient(invoice.metadata.customer_phone, invoice, waveLink);
-    toast.success('WhatsApp ouvert');
-  };
 
-  // Ouvrir le modal de confirmation de paiement
-  const handleOpenConfirmModal = (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
-    setWaveTransactionId('');
-    setShowConfirmModal(true);
+    try {
+      setSelectedInvoice(invoice);
+
+      // Générer une URL signée pour l'image
+      const { data } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(invoice.payment_proof_url, 3600);
+
+      if (data?.signedUrl) {
+        setProofImageUrl(data.signedUrl);
+      } else {
+        setProofImageUrl(invoice.payment_proof_url);
+      }
+
+      setShowProofModal(true);
+    } catch (error) {
+      console.error('Erreur chargement preuve:', error);
+      toast.error('Erreur lors du chargement de la preuve');
+    }
   };
 
   // Confirmer le paiement
-  const handleConfirmPayment = async () => {
-    if (!selectedInvoice) return;
-
-    setProcessing(true);
-    try {
-      const result = await confirmPayment(selectedInvoice.id, waveTransactionId || undefined);
-
-      if (!result.success) {
-        throw new Error(result.error || 'Erreur lors de la confirmation');
-      }
-
-      toast.success('Paiement confirmé ! Demande créée.');
-      setShowConfirmModal(false);
-      setSelectedInvoice(null);
-      loadInvoices();
-    } catch (error: any) {
-      console.error('Erreur confirmation:', error);
-      toast.error(error.message || 'Erreur lors de la confirmation');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
-  // Annuler une facture
-  const handleCancelInvoice = (invoice: Invoice) => {
+  const handleConfirmPayment = async (invoice: Invoice) => {
     Alert.alert(
-      'Annuler la facture',
-      `Êtes-vous sûr de vouloir annuler la facture ${invoice.reference} ?`,
+      'Confirmer le paiement',
+      `Confirmez-vous avoir reçu le paiement de ${invoice.amount.toLocaleString()} FCFA pour la facture ${invoice.reference} ?`,
       [
         { text: 'Non', style: 'cancel' },
         {
-          text: 'Oui, annuler',
+          text: 'Oui, confirmer',
+          style: 'default',
+          onPress: async () => {
+            setProcessing(true);
+            try {
+              const result = await confirmPayment(invoice.id);
+
+              if (!result.success) {
+                throw new Error(result.error || 'Erreur lors de la confirmation');
+              }
+
+              toast.success('Paiement confirmé ! Demande créée et assignée.');
+              setShowProofModal(false);
+              loadInvoices();
+            } catch (error: any) {
+              console.error('Erreur confirmation:', error);
+              toast.error(error.message || 'Erreur lors de la confirmation');
+            } finally {
+              setProcessing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Rejeter le paiement
+  const handleRejectPayment = async (invoice: Invoice) => {
+    Alert.alert(
+      'Rejeter le paiement',
+      `Êtes-vous sûr de vouloir rejeter ce paiement ? Le client sera notifié.`,
+      [
+        { text: 'Non', style: 'cancel' },
+        {
+          text: 'Oui, rejeter',
           style: 'destructive',
           onPress: async () => {
-            const success = await cancelInvoice(invoice.id);
-            if (success) {
-              toast.success('Facture annulée');
+            setProcessing(true);
+            try {
+              const result = await rejectPayment(invoice.id, 'Preuve de paiement invalide');
+
+              if (!result.success) {
+                throw new Error(result.error || 'Erreur lors du rejet');
+              }
+
+              toast.success('Paiement rejeté');
+              setShowProofModal(false);
               loadInvoices();
-            } else {
-              toast.error('Erreur lors de l\'annulation');
+            } catch (error: any) {
+              console.error('Erreur rejet:', error);
+              toast.error(error.message || 'Erreur lors du rejet');
+            } finally {
+              setProcessing(false);
             }
           },
         },
@@ -121,32 +158,14 @@ export default function PaymentsManagementScreen({ navigation }: any) {
     return date.toLocaleDateString('fr-FR', {
       day: '2-digit',
       month: 'short',
+      year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     });
   };
 
-  // Calculer le temps restant avant expiration
-  const getTimeRemaining = (expiresAt: string) => {
-    const now = new Date().getTime();
-    const expires = new Date(expiresAt).getTime();
-    const diff = expires - now;
-
-    if (diff <= 0) return 'Expirée';
-
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-
-    if (hours > 0) return `${hours}h ${minutes}min`;
-    return `${minutes} min`;
-  };
-
   if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text>Chargement...</Text>
-      </View>
-    );
+    return <Loading message="Chargement des paiements..." />;
   }
 
   return (
@@ -157,8 +176,10 @@ export default function PaymentsManagementScreen({ navigation }: any) {
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Paiements Wave</Text>
-          <Text style={styles.headerSubtitle}>{invoices.length} facture(s) en attente</Text>
+          <Text style={styles.headerTitle}>Paiements à valider</Text>
+          <Text style={styles.headerSubtitle}>
+            {invoices.length} paiement(s) en attente de validation
+          </Text>
         </View>
       </View>
 
@@ -175,136 +196,159 @@ export default function PaymentsManagementScreen({ navigation }: any) {
         {invoices.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="checkmark-circle" size={64} color="#10b981" />
-            <Text style={styles.emptyTitle}>Aucune facture en attente</Text>
+            <Text style={styles.emptyTitle}>Aucun paiement en attente</Text>
             <Text style={styles.emptySubtitle}>
-              Toutes les factures ont été traitées
+              Les paiements avec preuve apparaîtront ici
             </Text>
           </View>
         ) : (
           invoices.map((invoice) => (
-            <View key={invoice.id} style={styles.invoiceCard}>
-              {/* En-tête de la facture */}
+            <TouchableOpacity
+              key={invoice.id}
+              style={styles.invoiceCard}
+              onPress={() => handleViewProof(invoice)}
+              activeOpacity={0.7}
+            >
+              {/* Badge preuve */}
+              <View style={styles.proofBadge}>
+                <Ionicons name="document-attach" size={14} color="#047857" />
+                <Text style={styles.proofBadgeText}>Preuve reçue</Text>
+              </View>
+
+              {/* En-tête */}
               <View style={styles.invoiceHeader}>
-                <View>
+                <View style={styles.invoiceInfo}>
                   <Text style={styles.invoiceReference}>{invoice.reference}</Text>
                   <Text style={styles.invoiceDate}>{formatDate(invoice.created_at)}</Text>
                 </View>
-                <View style={styles.invoiceAmountContainer}>
+                <View style={styles.amountContainer}>
                   <Text style={styles.invoiceAmount}>
-                    {invoice.amount.toLocaleString()} FCFA
+                    {invoice.amount.toLocaleString()}
                   </Text>
-                  <Text style={styles.invoiceExpires}>
-                    Expire dans {getTimeRemaining(invoice.expires_at)}
-                  </Text>
+                  <Text style={styles.invoiceCurrency}>FCFA</Text>
                 </View>
               </View>
 
-              {/* Détails client */}
+              {/* Détails de la demande */}
               <View style={styles.invoiceDetails}>
                 <View style={styles.detailRow}>
-                  <Ionicons name="person" size={16} color="#6b7280" />
-                  <Text style={styles.detailText}>{invoice.metadata.customer_name}</Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Ionicons name="call" size={16} color="#6b7280" />
-                  <Text style={styles.detailText}>{invoice.metadata.customer_phone}</Text>
-                </View>
-                <View style={styles.detailRow}>
                   <Ionicons name="document-text" size={16} color="#6b7280" />
-                  <Text style={styles.detailText}>
-                    {invoice.metadata.document_type} - {invoice.metadata.city}
-                  </Text>
+                  <Text style={styles.detailText}>{invoice.metadata.document_type}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Ionicons name="location" size={16} color="#6b7280" />
+                  <Text style={styles.detailText}>{invoice.metadata.city}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Ionicons name="copy" size={16} color="#6b7280" />
+                  <Text style={styles.detailText}>{invoice.metadata.copies} copie(s)</Text>
                 </View>
               </View>
 
-              {/* Zone lien Wave */}
-              <View style={styles.waveLinkSection}>
-                <Text style={styles.waveLinkLabel}>Lien Wave à envoyer:</Text>
-                <TextInput
-                  style={styles.waveLinkInput}
-                  placeholder="Collez le lien Wave ici..."
-                  value={selectedInvoice?.id === invoice.id ? waveLink : ''}
-                  onChangeText={(text) => {
-                    setSelectedInvoice(invoice);
-                    setWaveLink(text);
-                  }}
-                  onFocus={() => setSelectedInvoice(invoice)}
-                />
-                <TouchableOpacity
-                  style={styles.sendWhatsAppButton}
-                  onPress={() => {
-                    setSelectedInvoice(invoice);
-                    handleSendWaveLink(invoice);
-                  }}
-                >
-                  <Ionicons name="logo-whatsapp" size={18} color="#ffffff" />
-                  <Text style={styles.sendWhatsAppText}>Envoyer au client</Text>
-                </TouchableOpacity>
+              {/* Client */}
+              <View style={styles.clientSection}>
+                <View style={styles.detailRow}>
+                  <Ionicons name="person" size={16} color="#047857" />
+                  <Text style={styles.clientName}>{invoice.metadata.customer_name}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Ionicons name="call" size={16} color="#047857" />
+                  <Text style={styles.clientPhone}>{invoice.metadata.customer_phone}</Text>
+                </View>
               </View>
 
-              {/* Actions */}
-              <View style={styles.invoiceActions}>
-                <TouchableOpacity
-                  style={styles.confirmButton}
-                  onPress={() => handleOpenConfirmModal(invoice)}
-                >
-                  <Ionicons name="checkmark-circle" size={18} color="#ffffff" />
-                  <Text style={styles.confirmButtonText}>Confirmer paiement</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => handleCancelInvoice(invoice)}
-                >
-                  <Ionicons name="close-circle" size={18} color="#dc2626" />
-                </TouchableOpacity>
+              {/* Appel à l'action */}
+              <View style={styles.cardFooter}>
+                <Text style={styles.tapToView}>Appuyez pour voir la preuve</Text>
+                <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
               </View>
-            </View>
+            </TouchableOpacity>
           ))
         )}
       </ScrollView>
 
-      {/* Modal de confirmation */}
+      {/* Modal de visualisation de la preuve */}
       <Modal
-        visible={showConfirmModal}
+        visible={showProofModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowConfirmModal(false)}
+        onRequestClose={() => setShowProofModal(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Confirmer le paiement</Text>
-            <Text style={styles.modalSubtitle}>
-              Facture: {selectedInvoice?.reference}
-            </Text>
-            <Text style={styles.modalAmount}>
-              {selectedInvoice?.amount.toLocaleString()} FCFA
-            </Text>
+            {/* Header modal */}
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Preuve de paiement</Text>
+                <Text style={styles.modalSubtitle}>{selectedInvoice?.reference}</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowProofModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
 
-            <Text style={styles.inputLabel}>ID Transaction Wave (optionnel)</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Ex: TXN123456789"
-              value={waveTransactionId}
-              onChangeText={setWaveTransactionId}
-            />
+            {/* Détails facture */}
+            {selectedInvoice && (
+              <View style={styles.modalInvoiceInfo}>
+                <View style={styles.modalInfoRow}>
+                  <Text style={styles.modalInfoLabel}>Document:</Text>
+                  <Text style={styles.modalInfoValue}>{selectedInvoice.metadata.document_type}</Text>
+                </View>
+                <View style={styles.modalInfoRow}>
+                  <Text style={styles.modalInfoLabel}>Ville:</Text>
+                  <Text style={styles.modalInfoValue}>{selectedInvoice.metadata.city}</Text>
+                </View>
+                <View style={styles.modalInfoRow}>
+                  <Text style={styles.modalInfoLabel}>Montant:</Text>
+                  <Text style={styles.modalInfoValueBold}>
+                    {selectedInvoice.amount.toLocaleString()} FCFA
+                  </Text>
+                </View>
+                <View style={styles.modalInfoRow}>
+                  <Text style={styles.modalInfoLabel}>Client:</Text>
+                  <Text style={styles.modalInfoValue}>{selectedInvoice.metadata.customer_name}</Text>
+                </View>
+              </View>
+            )}
 
+            {/* Image de la preuve */}
+            <View style={styles.proofImageContainer}>
+              {proofImageUrl ? (
+                <Image
+                  source={{ uri: proofImageUrl }}
+                  style={styles.proofImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={styles.noProofPlaceholder}>
+                  <Ionicons name="image-outline" size={48} color="#d1d5db" />
+                  <Text style={styles.noProofText}>Chargement...</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Actions */}
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => setShowConfirmModal(false)}
+                style={[styles.rejectButton, processing && styles.buttonDisabled]}
+                onPress={() => selectedInvoice && handleRejectPayment(selectedInvoice)}
                 disabled={processing}
               >
-                <Text style={styles.modalCancelText}>Annuler</Text>
+                <Ionicons name="close-circle" size={20} color="#dc2626" />
+                <Text style={styles.rejectButtonText}>Rejeter</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalConfirmButton, processing && styles.buttonDisabled]}
-                onPress={handleConfirmPayment}
+                style={[styles.confirmButton, processing && styles.buttonDisabled]}
+                onPress={() => selectedInvoice && handleConfirmPayment(selectedInvoice)}
                 disabled={processing}
               >
-                <Text style={styles.modalConfirmText}>
-                  {processing ? 'Traitement...' : 'Confirmer'}
+                <Ionicons name="checkmark-circle" size={20} color="#ffffff" />
+                <Text style={styles.confirmButtonText}>
+                  {processing ? 'Traitement...' : 'Confirmer le paiement'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -320,11 +364,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   header: {
     backgroundColor: '#047857',
     paddingTop: 50,
@@ -332,11 +371,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#047857',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
   },
   backButton: {
     width: 40,
@@ -378,6 +412,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     marginTop: 4,
+    textAlign: 'center',
   },
   invoiceCard: {
     backgroundColor: '#ffffff',
@@ -392,11 +427,30 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#f59e0b',
   },
+  proofBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#d1fae5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 12,
+    gap: 4,
+  },
+  proofBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#047857',
+  },
   invoiceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
+  },
+  invoiceInfo: {
+    flex: 1,
   },
   invoiceReference: {
     fontSize: 16,
@@ -408,26 +462,25 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginTop: 2,
   },
-  invoiceAmountContainer: {
+  amountContainer: {
     alignItems: 'flex-end',
   },
   invoiceAmount: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '900',
     color: '#111827',
   },
-  invoiceExpires: {
+  invoiceCurrency: {
     fontSize: 11,
-    color: '#f59e0b',
+    color: '#6b7280',
     fontWeight: '600',
-    marginTop: 2,
   },
   invoiceDetails: {
     backgroundColor: '#f9fafb',
     borderRadius: 10,
     padding: 12,
     marginBottom: 12,
-    gap: 8,
+    gap: 6,
   },
   detailRow: {
     flexDirection: 'row',
@@ -439,144 +492,148 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontWeight: '500',
   },
-  waveLinkSection: {
-    backgroundColor: '#e0f2fe',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
+  clientSection: {
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    paddingTop: 12,
+    gap: 6,
   },
-  waveLinkLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0369a1',
-    marginBottom: 8,
-  },
-  waveLinkInput: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 13,
-    borderWidth: 1,
-    borderColor: '#7dd3fc',
-    marginBottom: 10,
-  },
-  sendWhatsAppButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#25D366',
-    borderRadius: 8,
-    padding: 10,
-    gap: 8,
-  },
-  sendWhatsAppText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  invoiceActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  confirmButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#047857',
-    borderRadius: 10,
-    padding: 12,
-    gap: 8,
-  },
-  confirmButtonText: {
+  clientName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#111827',
   },
-  cancelButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: '#fef2f2',
-    justifyContent: 'center',
+  clientPhone: {
+    fontSize: 13,
+    color: '#047857',
+    fontWeight: '600',
+  },
+  cardFooter: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#fecaca',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    gap: 4,
+  },
+  tapToView: {
+    fontSize: 13,
+    color: '#9ca3af',
+    fontWeight: '500',
   },
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   modalContent: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
-    padding: 24,
     width: '100%',
-    maxWidth: 400,
+    maxHeight: '90%',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: '#111827',
-    textAlign: 'center',
-    marginBottom: 4,
   },
   modalSubtitle: {
     fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  modalAmount: {
-    fontSize: 28,
-    fontWeight: '900',
     color: '#047857',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
+    marginTop: 2,
   },
-  modalInput: {
+  closeButton: {
+    padding: 4,
+  },
+  modalInvoiceInfo: {
+    padding: 16,
     backgroundColor: '#f9fafb',
-    borderRadius: 10,
-    padding: 14,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    marginBottom: 20,
+    gap: 8,
+  },
+  modalInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalInfoLabel: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  modalInfoValue: {
+    fontSize: 13,
+    color: '#111827',
+    fontWeight: '500',
+  },
+  modalInfoValueBold: {
+    fontSize: 14,
+    color: '#047857',
+    fontWeight: '800',
+  },
+  proofImageContainer: {
+    backgroundColor: '#f3f4f6',
+    minHeight: 300,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  proofImage: {
+    width: screenWidth - 32,
+    height: 350,
+  },
+  noProofPlaceholder: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  noProofText: {
+    color: '#9ca3af',
+    marginTop: 8,
   },
   modalActions: {
     flexDirection: 'row',
+    padding: 16,
     gap: 12,
   },
-  modalCancelButton: {
+  rejectButton: {
     flex: 1,
-    padding: 14,
-    borderRadius: 10,
-    backgroundColor: '#f3f4f6',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fef2f2',
+    borderRadius: 12,
+    padding: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
   },
-  modalCancelText: {
+  rejectButtonText: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#6b7280',
+    fontWeight: '700',
+    color: '#dc2626',
   },
-  modalConfirmButton: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 10,
-    backgroundColor: '#047857',
+  confirmButton: {
+    flex: 2,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#047857',
+    borderRadius: 12,
+    padding: 14,
+    gap: 8,
   },
-  modalConfirmText: {
+  confirmButtonText: {
     fontSize: 15,
     fontWeight: '700',
     color: '#ffffff',
