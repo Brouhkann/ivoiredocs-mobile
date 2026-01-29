@@ -8,7 +8,7 @@ import Loading from '../../components/ui/Loading';
 import { supabase } from '../../config/supabase';
 import { type Invoice, cancelInvoice } from '../../services/wavePaymentService';
 
-const WAVE_PAYMENT_BASE_URL = 'https://pay.wave.com/m/M_ci_i7JxKIwiaf99/c/ci/?amount=';
+const WAVE_PAYMENT_BASE_URL = 'https://pay.wave.com/m/M_ci_w0uiv5NMBefY/c/ci/?amount=';
 
 export default function InvoiceActionScreen({ route, navigation }: any) {
   const { invoice } = route.params as { invoice: Invoice };

@@ -23,7 +23,15 @@
       "Bash(gh run view:*)",
       "Bash(gh repo edit:*)",
       "Bash(gh secret set:*)",
-      "Bash(gh workflow run:*)"
+      "Bash(gh workflow run:*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(dir:*)",
+      "Bash(gh repo view:*)",
+      "Bash(xargs:*)",
+      "Bash(eas build:list:*)",
+      "Bash(npx eslint:*)",
+      "Bash(node -e \"require\\(''./src/screens/admin/CitySetupScreen.tsx''\\)\")"
     ]
   }
 }
