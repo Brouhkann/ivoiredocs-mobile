@@ -14,7 +14,7 @@ import {
 import { supabase } from '../../config/supabase';
 
 // Lien Wave de paiement
-const WAVE_PAYMENT_BASE_URL = 'https://pay.wave.com/m/M_ci_i7JxKIwiaf99/c/ci/?amount=';
+const WAVE_PAYMENT_BASE_URL = 'https://pay.wave.com/m/M_ci_w0uiv5NMBefY/c/ci/?amount=';
 
 export default function PaymentScreen({ route, navigation }: any) {
   const { requestData } = route.params;
