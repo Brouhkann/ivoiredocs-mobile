@@ -35,6 +35,7 @@ const statusLabels: Record<RequestStatus, string> = {
   in_progress: 'En cours de traitement',
   ready: 'Document prêt',
   shipped: 'Expédié',
+  in_transit: 'En cours de livraison',
   delivered: 'Livré',
   completed: 'Terminé',
   cancelled: 'Annulé',

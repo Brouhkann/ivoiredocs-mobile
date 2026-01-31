@@ -56,6 +56,7 @@ interface AuthState {
   updateProfile: (profile: Partial<AppUser>) => Promise<void>;
   isAdmin: () => boolean;
   isDelegate: () => boolean;
+  isDriver: () => boolean;
   isUser: () => boolean;
 }
 
@@ -313,6 +314,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isDelegate: () => {
     const { profile } = get();
     return profile?.role === "delegate";
+  },
+
+  isDriver: () => {
+    const { profile } = get();
+    return profile?.role === "driver";
   },
 
   isUser: () => {

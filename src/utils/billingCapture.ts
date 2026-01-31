@@ -24,7 +24,8 @@ export function captureSingleDocumentBillingDetails(
   copies: number,
   city: string,
   serviceType: string,
-  deliveryData: Record<string, string>
+  deliveryData: Record<string, string>,
+  expressPriceOverride?: number
 ): BillingDetails {
   const docConfig = DOCUMENT_CONFIGS[documentType];
   const unitPrice = calculatePrice(documentType, city, 1, serviceType);
@@ -63,7 +64,7 @@ export function captureSingleDocumentBillingDetails(
   } else if (villeEtablissement === villeDestination.toLowerCase()) {
     // Pas de frais d'expédition si même ville
   } else if (isEtablissementAbidjan && !isDestinationAbidjan) {
-    if (moyenRecuperation === "moi_meme_gare") {
+    if (moyenRecuperation === "moi_meme_gare" || moyenRecuperation === "livraison_express") {
       fraisExpedition = moyenExpedition === "utb" ? 1000 * totalCopies : 1000;
       const moyenText = moyenExpedition === 'utb' ? 'UTB' : (deliveryData["preference_transport"] || 'autre compagnie');
       const villeEtabFormatted = city.charAt(0).toUpperCase() + city.slice(1).toLowerCase();
@@ -154,19 +155,20 @@ export function captureSingleDocumentBillingDetails(
 
   if (isEtablissementAbidjan && isDestinationAbidjan) {
     if (moyenRecuperation === "livraison_express") {
-      livraisonExpress = 2000;
+      livraisonExpress = expressPriceOverride ?? 2000;
     }
   } else if (isEtablissementAbidjan && !isDestinationAbidjan) {
-    if (moyenRecuperation === "moi_meme_gare") {
-      livraisonExpress = 2000;
+    // Pickup obligatoire par livreur (mairie → gare d'Adjame), quel que soit le moyen de recuperation
+    if (moyenRecuperation === "moi_meme_gare" || moyenRecuperation === "livraison_express") {
+      livraisonExpress = expressPriceOverride ?? 2000;
     }
   } else if (!isEtablissementAbidjan && isDestinationAbidjan) {
     if (moyenRecuperation === "livraison_express") {
-      livraisonExpress = 2000;
+      livraisonExpress = expressPriceOverride ?? 2000;
     }
   } else if (!isEtablissementAbidjan && !isDestinationAbidjan) {
     if (moyenRecuperation === "livraison_express") {
-      livraisonExpress = 2000;
+      livraisonExpress = expressPriceOverride ?? 2000;
     }
   }
 
@@ -200,8 +202,11 @@ export function captureSingleDocumentBillingDetails(
   }
 
   if (livraisonExpress > 0) {
+    const expressDescription = isEtablissementAbidjan && !isDestinationAbidjan
+      ? `Recuperation livreur (mairie → gare)`
+      : "Livraison express";
     billingDetails.express_delivery = {
-      description: "Livraison express",
+      description: expressDescription,
       amount: livraisonExpress,
     };
   }

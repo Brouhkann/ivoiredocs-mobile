@@ -145,6 +145,8 @@ export async function updateRequestStatus(
       updateData.ready_at = new Date().toISOString();
     } else if (status === 'shipped') {
       updateData.shipped_at = new Date().toISOString();
+    } else if (status === 'in_transit') {
+      updateData.in_transit_at = new Date().toISOString();
     } else if (status === 'delivered') {
       updateData.delivered_at = new Date().toISOString();
     } else if (status === 'completed') {

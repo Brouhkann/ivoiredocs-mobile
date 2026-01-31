@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type DashboardMode = 'user' | 'delegate';
+type DashboardMode = 'user' | 'delegate' | 'driver';
 
 interface DashboardState {
   mode: DashboardMode;
@@ -24,7 +24,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   initializeMode: async () => {
     try {
       const savedMode = await AsyncStorage.getItem('dashboardMode');
-      if (savedMode === 'user' || savedMode === 'delegate') {
+      if (savedMode === 'user' || savedMode === 'delegate' || savedMode === 'driver') {
         set({ mode: savedMode });
       }
     } catch (error) {

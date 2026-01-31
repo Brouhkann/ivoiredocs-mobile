@@ -46,6 +46,7 @@ export const statusColors = {
   in_progress: '#8b5cf6', // purple-500
   ready: '#10b981',      // emerald-500
   shipped: '#06b6d4',    // cyan-500
+  in_transit: '#2563eb', // blue-600
   delivered: '#10b981',  // emerald-500
   completed: '#22c55e',  // green-500
   cancelled: '#ef4444',  // red-500

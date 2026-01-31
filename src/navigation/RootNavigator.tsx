@@ -6,6 +6,7 @@ import { useDashboardStore } from '../stores/dashboardStore';
 import AuthNavigator from './AuthNavigator';
 import UserNavigator from './UserNavigator';
 import DelegateNavigator from './DelegateNavigator';
+import DriverNavigator from './DriverNavigator';
 import AdminNavigator from './AdminNavigator';
 import WelcomeScreen from '../screens/WelcomeScreen';
 import { ActivityIndicator, View } from 'react-native';
@@ -41,6 +42,13 @@ export default function RootNavigator() {
         ) : profile?.role === 'admin' || profile?.role === 'support' ? (
           // Les admins et support accèdent au dashboard admin
           <Stack.Screen name="Admin" component={AdminNavigator} />
+        ) : profile?.role === 'driver' ? (
+          // Les livreurs peuvent accéder aux deux dashboards
+          mode === 'driver' ? (
+            <Stack.Screen name="Driver" component={DriverNavigator} />
+          ) : (
+            <Stack.Screen name="User" component={UserNavigator} />
+          )
         ) : profile?.role === 'delegate' ? (
           // Les délégués peuvent accéder aux deux dashboards
           mode === 'delegate' ? (

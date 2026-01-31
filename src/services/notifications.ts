@@ -231,15 +231,15 @@ const MESSAGE_TEMPLATES = {
 
   // 3. 🏃 Kouamé récupère le document - Version récupération sur place
   document_ready_pickup: (variables: Record<string, string>) =>
-    `Votre document est prêt, vous pouvez passer le récupérer à la ${variables.serviceType} de ${variables.city} - Ivoiredocs.com`,
+    `Bonne nouvelle! Votre document est pret et vous attend a la ${variables.serviceType} de ${variables.city}. Passez le recuperer des que possible. On est la pour vous! - Ivoiredocs.com`,
 
   // 3. 🏃 Kouamé récupère le document - Version expédition
   document_ready_shipping: (variables: Record<string, string>) =>
-    `Votre document est prêt et sera expédié d'ici peu - Ivoiredocs.com`,
+    `Bonne nouvelle! Votre document est pret et sera expedie tres bientot. On vous tient au courant de la suite. Merci pour votre confiance! - Ivoiredocs.com`,
 
   // 4. 🚛 Kouamé a expédié les documents
   document_shipped: (variables: Record<string, string>) =>
-    `Votre document a été expédié par ${variables.transportCompany} avec pour code retrait "${variables.retrievalCode}". Appelez au besoin ce numéro: ${variables.supportPhone} - Ivoiredocs.com`,
+    `Votre document est en route! Expedie par ${variables.transportCompany}, code retrait: "${variables.retrievalCode}". Pour toute question appelez le ${variables.supportPhone}. Bonne reception! - Ivoiredocs.com`,
 
   // Messages existants gardés pour compatibilité
   delegate_assigned: (variables: Record<string, string>) =>
@@ -249,7 +249,7 @@ const MESSAGE_TEMPLATES = {
     `Document livré! Comment ça s'est passé? Notez votre délégué: ${variables.ratingUrl} - Ivoiredocs.com`,
 
   payment_received: (variables: Record<string, string>) =>
-    `Paiement ${variables.amount} FCFA reçu pour ${variables.document}. On traite maintenant. Merci! - Ivoiredocs.com`,
+    `Merci! Votre paiement de ${variables.amount} FCFA pour ${variables.document} a bien ete recu. Notre equipe s'en occupe maintenant. On vous tient informe de chaque etape! - Ivoiredocs.com`,
 
   payment_pending: (variables: Record<string, string>) =>
     `Demande #${variables.orderNumber} attend paiement: ${variables.amount} FCFA. Orange Money/MTN: ${variables.paymentPhone}`,
@@ -268,6 +268,14 @@ const MESSAGE_TEMPLATES = {
 
   low_delegate_availability: (variables: Record<string, string>) =>
     `⚠️ ALERTE: Peu de délégués libres à ${variables.city}. ${variables.pendingRequests} demandes en attente!`,
+
+  // 5. Livreur recupere le colis - SMS au client avec code secret
+  delivery_picked_up: (variables: Record<string, string>) =>
+    `Votre document est en cours de livraison vers ${variables.sector}, ${variables.commune}. Votre code de confirmation : ${variables.code}. Donnez-le au livreur a la reception. - Ivoiredocs.com`,
+
+  // 6. Livraison express confirmee - SMS au client
+  delivery_completed_express: (variables: Record<string, string>) =>
+    `Votre document a ete livre avec succes! Merci pour votre confiance - Ivoiredocs.com`,
 };
 
 export class NotificationService {
@@ -849,6 +857,70 @@ export class NotificationService {
       console.log(`✅ SMS expédition envoyé à ${user.phone}`);
     } catch (error) {
       console.error("Erreur notification expédition:", error);
+    }
+  }
+
+  // === MÉTHODES LIVRAISON EXPRESS ===
+
+  // 5. Notification livreur a recupere le colis - SMS au client avec code secret
+  static async notifyDeliveryPickedUp(orderId: string): Promise<void> {
+    try {
+      const { data: order, error } = await supabase
+        .from("requests")
+        .select(`
+          *,
+          users (name, phone)
+        `)
+        .eq("id", orderId)
+        .single();
+
+      if (error || !order) {
+        console.error("Commande introuvable:", orderId);
+        return;
+      }
+
+      const user = (order as any).users;
+      const formData = order.form_data || {};
+      const deliveryData = formData.delivery_data || formData;
+      const sector = deliveryData.delivery_sector_name || deliveryData.ville_destination || '';
+      const commune = deliveryData.delivery_commune || deliveryData.ville_destination || '';
+      const code = order.delivery_code || '????';
+
+      const variables = {
+        sector,
+        commune,
+        code,
+      };
+
+      await this.sendSMS(user.phone, "delivery_picked_up", variables);
+      console.log(`✅ SMS pickup livreur envoyé à ${user.phone} avec code ${code}`);
+    } catch (error) {
+      console.error("Erreur notification pickup livreur:", error);
+    }
+  }
+
+  // 6. Notification livraison express confirmee - SMS au client
+  static async notifyExpressDeliveryCompleted(orderId: string): Promise<void> {
+    try {
+      const { data: order, error } = await supabase
+        .from("requests")
+        .select(`
+          *,
+          users (name, phone)
+        `)
+        .eq("id", orderId)
+        .single();
+
+      if (error || !order) {
+        console.error("Commande introuvable:", orderId);
+        return;
+      }
+
+      const user = (order as any).users;
+      await this.sendSMS(user.phone, "delivery_completed_express", {});
+      console.log(`✅ SMS livraison express confirmée envoyé à ${user.phone}`);
+    } catch (error) {
+      console.error("Erreur notification livraison express:", error);
     }
   }
 

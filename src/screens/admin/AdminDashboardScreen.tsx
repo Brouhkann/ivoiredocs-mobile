@@ -554,6 +554,22 @@ export default function AdminDashboardScreen({ navigation }: any) {
               <Text style={styles.actionLabel}>Dotations</Text>
               <Text style={styles.actionSubLabel}>Délégués</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('ZonesManagement')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#e0f2fe' }]}>
+                <Ionicons name="map" size={28} color="#0284c7" />
+              </View>
+              <Text style={styles.actionLabel}>Zones</Text>
+              <Text style={styles.actionSubLabel}>Secteurs</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionCard} onPress={() => navigation.navigate('DriversManagement')}>
+              <View style={[styles.actionIcon, { backgroundColor: '#dbeafe' }]}>
+                <Ionicons name="bicycle" size={28} color="#2563eb" />
+              </View>
+              <Text style={styles.actionLabel}>Livreurs</Text>
+              <Text style={styles.actionSubLabel}>Express</Text>
+            </TouchableOpacity>
           </View>
         </View>
 

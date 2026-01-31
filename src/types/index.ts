@@ -1,5 +1,5 @@
 // Types principaux pour Ivoiredocs.com
-export type UserRole = "user" | "delegate" | "admin" | "support";
+export type UserRole = "user" | "delegate" | "admin" | "support" | "driver";
 
 // Énumérations - Types de documents et services (déclarés en premier)
 export type DocumentType =
@@ -24,6 +24,7 @@ export type RequestStatus =
   | "in_progress"
   | "ready"
   | "shipped"
+  | "in_transit"
   | "delivered"
   | "completed"
   | "cancelled";
@@ -129,6 +130,13 @@ export interface Request {
   shipping_receipt_photo?: string; // URL de la photo du reçu d'expédition
   delivered_at?: string; // Document livré (client confirme ou admin valide)
   completed_at?: string; // Processus terminé
+  driver_id?: string;
+  delivery_sector_id?: string;
+  delivery_zone_id?: string;
+  pickup_zone_id?: string;
+  in_transit_at?: string;
+  delivery_proof_photo?: string;
+  delivery_code?: string;
   form_data?: any;
   attachments?: RequestAttachment[]; // Pièces jointes
 }
@@ -248,4 +256,58 @@ export interface RequestAlert {
   message: string;
   created_at: string;
   severity: "low" | "medium" | "high";
+}
+
+// Types Livraison Express
+export interface DeliveryZone {
+  id: string;
+  name: string;
+  code: string;
+  communes: string[];
+  is_active: boolean;
+  display_order: number;
+}
+
+export interface DeliverySector {
+  id: string;
+  zone_id: string;
+  commune: string;
+  name: string;
+  slug: string;
+  latitude: number;
+  longitude: number;
+  is_active: boolean;
+  display_order: number;
+}
+
+export interface DeliveryPricingConfig {
+  id: string;
+  base_fee: number;
+  per_km_rate: number;
+  road_factor: number;
+  rounding: number;
+  min_price: number;
+  max_price: number;
+  updated_at: string;
+}
+
+export interface Driver {
+  id: string;
+  user_id: string;
+  name: string;
+  phone: string;
+  zone_id?: string;
+  is_active: boolean;
+  is_available: boolean;
+  total_deliveries: number;
+  rating: number;
+  mobile_money_contact?: string;
+}
+
+export interface CommunePickupPoint {
+  id: string;
+  commune: string;
+  name: string;
+  latitude: number;
+  longitude: number;
 }
