@@ -51,6 +51,7 @@ export default function RequestFormScreen({ route, navigation }: any) {
 
   // État du formulaire - Étape 2 (Livraison)
   const [deliveryData, setDeliveryData] = useState<Record<string, string>>({});
+  const [deliveryMode, setDeliveryMode] = useState<'pickup' | 'delivery' | ''>('');
 
   // État pour la ville (autocomplete)
   const [availableCities, setAvailableCities] = useState<Array<{
@@ -199,6 +200,56 @@ export default function RequestFormScreen({ route, navigation }: any) {
     }
   }, [currentStep, profile]);
 
+  // Reset au changement de deliveryMode
+  useEffect(() => {
+    if (deliveryMode === 'pickup') {
+      setDeliveryData(prev => ({
+        ...prev,
+        moyen_recuperation: `moi_meme_service_${city}`,
+        ville_destination: '',
+        moyen_expedition: '',
+        preference_transport: '',
+      }));
+      setSelectedExpressCommune('');
+      setSelectedExpressSector(null);
+    } else if (deliveryMode === 'delivery') {
+      setDeliveryData(prev => ({
+        ...prev,
+        moyen_recuperation: '',
+        moyen_expedition: '',
+        preference_transport: '',
+      }));
+      setSelectedExpressCommune('');
+      setSelectedExpressSector(null);
+    }
+  }, [deliveryMode]);
+
+  // Auto-set moyen_recuperation selon le scenario (en mode delivery)
+  useEffect(() => {
+    if (deliveryMode !== 'delivery') return;
+    if (!deliveryScenario) return;
+    if (deliveryScenario === 'case_a') {
+      setDeliveryData(prev => ({ ...prev, moyen_recuperation: 'livraison_express', moyen_expedition: '' }));
+    } else if (deliveryScenario === 'case_c') {
+      setDeliveryData(prev => ({ ...prev, moyen_recuperation: 'moi_meme_gare' }));
+    } else if (deliveryScenario === 'case_b') {
+      setDeliveryData(prev => ({ ...prev, moyen_recuperation: '', moyen_expedition: '' }));
+      setSelectedExpressCommune('');
+      setSelectedExpressSector(null);
+    }
+  }, [deliveryScenario, deliveryMode]);
+
+  // Prefill deliveryMode depuis données pré-remplies
+  useEffect(() => {
+    if (deliveryData.moyen_recuperation && !deliveryMode) {
+      if (deliveryData.moyen_recuperation.startsWith('moi_meme_service_')) {
+        setDeliveryMode('pickup');
+      } else {
+        setDeliveryMode('delivery');
+      }
+    }
+  }, [deliveryData.moyen_recuperation]);
+
   // Prix du document uniquement
   const documentsOnlyPrice = useMemo(() => {
     if (!city || !serviceAdmin) return 0;
@@ -237,6 +288,26 @@ export default function RequestFormScreen({ route, navigation }: any) {
     }
   }, [documentType, copies, city, serviceAdmin, deliveryData, expressPrice, pickupToGarePrice]);
 
+  // Scenario de livraison basé sur source/destination
+  const deliveryScenario = useMemo(() => {
+    const dest = deliveryData.ville_destination?.trim() || '';
+    if (!dest) return null;
+    const sourceIsAbidjan = isAbidjanCommune(city);
+    const destIsAbidjan = isAbidjanCommune(dest);
+    if (sourceIsAbidjan && destIsAbidjan) return 'case_a';
+    if (!sourceIsAbidjan && destIsAbidjan) return 'case_b';
+    return 'case_c';
+  }, [city, deliveryData.ville_destination]);
+
+  // Faut-il afficher la section expédition ?
+  const needsExpeditionSection = useMemo(() => {
+    if (deliveryMode !== 'delivery') return false;
+    if (!deliveryScenario) return false;
+    if (deliveryScenario === 'case_a') return false;
+    if (deliveryScenario === 'case_b') return !!deliveryData.moyen_recuperation;
+    return true; // case_c
+  }, [deliveryMode, deliveryScenario, deliveryData.moyen_recuperation]);
+
   // Catégorie du document
   const documentCategory = useMemo(() => {
     if (['declaration_naissance', 'extrait_acte_naissance', 'copie_integrale_naissance'].includes(documentType)) {
@@ -274,30 +345,46 @@ export default function RequestFormScreen({ route, navigation }: any) {
 
   // Validation de l'étape 2
   const isStep2Valid = useMemo(() => {
+    // Toujours requis: nom, contact, mode
     if (!deliveryData.nom_destinataire?.trim()) return false;
     if (!deliveryData.contact1?.trim()) return false;
-    if (!deliveryData.moyen_recuperation) return false;
+    if (!deliveryMode) return false;
 
-    const isRecuperationAuService = deliveryData.moyen_recuperation?.startsWith('moi_meme_service_');
-    if (!isRecuperationAuService && !deliveryData.ville_destination?.trim()) return false;
-
-    // Pour livraison express intra-Abidjan avec secteurs, exiger la selection d'un secteur
-    if (deliveryData.moyen_recuperation === 'livraison_express' && expressCommunesData.length > 0) {
-      const destIsAbidjan = deliveryData.ville_destination && isAbidjanCommune(deliveryData.ville_destination);
-      if (destIsAbidjan) {
-        if (!selectedExpressSector) return false;
-        return true; // Pas besoin de moyen d'expedition pour express intra-Abidjan
-      }
-      // Express vers hors-Abidjan: besoin du moyen d'expedition (tombe dans la logique ci-dessous)
+    // Pickup: moyen_recuperation doit commencer par moi_meme_service_
+    if (deliveryMode === 'pickup') {
+      return !!deliveryData.moyen_recuperation?.startsWith('moi_meme_service_');
     }
 
-    const needsExpedition = deliveryData.moyen_recuperation === 'moi_meme_gare' || deliveryData.moyen_recuperation === 'livraison_express';
-    if (needsExpedition && !deliveryData.moyen_expedition) return false;
+    // Delivery: ville_destination requise
+    if (!deliveryData.ville_destination?.trim()) return false;
+    if (!deliveryScenario) return false;
 
+    if (deliveryScenario === 'case_a') {
+      // Express intra-Abidjan: secteur requis
+      return !!selectedExpressSector;
+    }
+
+    if (deliveryScenario === 'case_b') {
+      if (!deliveryData.moyen_recuperation) return false;
+      if (deliveryData.moyen_recuperation === 'livraison_express') {
+        // Express + expedition
+        if (!selectedExpressSector) return false;
+        if (!deliveryData.moyen_expedition) return false;
+      } else {
+        // Gare: expedition requise
+        if (!deliveryData.moyen_expedition) return false;
+      }
+    }
+
+    if (deliveryScenario === 'case_c') {
+      if (!deliveryData.moyen_expedition) return false;
+    }
+
+    // Compagnie custom: nom requis
     if (deliveryData.moyen_expedition === 'transport_classique' && !deliveryData.preference_transport?.trim()) return false;
 
     return true;
-  }, [deliveryData, selectedExpressSector, expressCommunesData]);
+  }, [deliveryData, deliveryMode, deliveryScenario, selectedExpressSector]);
 
   const handleNextStep = () => {
     if (!city || !serviceAdmin) {
@@ -758,8 +845,8 @@ export default function RequestFormScreen({ route, navigation }: any) {
                 <Text style={styles.backToStep1Text}>Retour aux informations</Text>
               </TouchableOpacity>
 
-              {/* Informations de livraison */}
-              <SectionCard title="Informations de livraison" icon="location">
+              {/* SECTION 1 : Infos destinataire */}
+              <SectionCard title="Informations du destinataire" icon="person">
                 <TextInput
                   label="Nom du destinataire *"
                   value={deliveryData.nom_destinataire || ''}
@@ -791,346 +878,470 @@ export default function RequestFormScreen({ route, navigation }: any) {
                   outlineColor="#e5e7eb"
                   activeOutlineColor="#047857"
                 />
-
-                <TextInput
-                  label={`Ville de destination ${!deliveryData.moyen_recuperation?.startsWith('moi_meme_service_') ? '*' : ''}`}
-                  value={deliveryData.ville_destination || ''}
-                  onChangeText={(value) => {
-                    setDeliveryData({ ...deliveryData, ville_destination: value });
-                    // Reset secteur si on change la ville
-                    setSelectedExpressCommune('');
-                    setSelectedExpressSector(null);
-                  }}
-                  mode="outlined"
-                  style={styles.input}
-                  placeholder="Ex: Cocody, Abobo, Bouaké..."
-                  outlineColor="#e5e7eb"
-                  activeOutlineColor="#047857"
-                />
-                {(isAbidjanCommune(city) || (deliveryData.ville_destination && isAbidjanCommune(deliveryData.ville_destination))) && expressCommunesData.length > 0 && (
-                  <Text style={styles.infoText}>Livraison express disponible (document etabli a {city})</Text>
-                )}
               </SectionCard>
 
               <Divider style={styles.divider} />
 
-              {/* Mode de récupération */}
-              <SectionCard title="Mode de récupération" icon="cube">
+              {/* SECTION 2 : Mode de récupération (pickup vs delivery) */}
+              <SectionCard title="Mode de recuperation" icon="cube">
                 <View style={styles.radioGroup}>
                   <TouchableOpacity
                     style={styles.radioOption}
-                    onPress={() => setDeliveryData({ ...deliveryData, moyen_recuperation: `moi_meme_service_${city}` })}
+                    onPress={() => setDeliveryMode('pickup')}
                   >
                     <RadioButton.Android
-                      value={`moi_meme_service_${city}`}
-                      status={deliveryData.moyen_recuperation === `moi_meme_service_${city}` ? 'checked' : 'unchecked'}
-                      onPress={() => setDeliveryData({ ...deliveryData, moyen_recuperation: `moi_meme_service_${city}` })}
+                      value="pickup"
+                      status={deliveryMode === 'pickup' ? 'checked' : 'unchecked'}
+                      onPress={() => setDeliveryMode('pickup')}
                       color="#047857"
                     />
                     <View style={styles.radioContent}>
                       <Text style={styles.radioLabel}>
-                        Récupérer à la {serviceAdmin === 'sous_prefecture' ? 'sous-préfecture' : 'mairie'} de {city}
+                        Recuperer a la {serviceAdmin === 'sous_prefecture' ? 'sous-prefecture' : 'mairie'} de {city}
                       </Text>
-                      <Text style={styles.radioDescription}>💰 Le plus économique - Frais de prestation uniquement</Text>
+                      <Text style={styles.radioDescription}>Le plus economique - Frais de prestation uniquement</Text>
                     </View>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={styles.radioOption}
-                    onPress={() => setDeliveryData({ ...deliveryData, moyen_recuperation: 'moi_meme_gare' })}
+                    onPress={() => setDeliveryMode('delivery')}
                   >
                     <RadioButton.Android
-                      value="moi_meme_gare"
-                      status={deliveryData.moyen_recuperation === 'moi_meme_gare' ? 'checked' : 'unchecked'}
-                      onPress={() => setDeliveryData({ ...deliveryData, moyen_recuperation: 'moi_meme_gare' })}
+                      value="delivery"
+                      status={deliveryMode === 'delivery' ? 'checked' : 'unchecked'}
+                      onPress={() => setDeliveryMode('delivery')}
                       color="#047857"
                     />
                     <View style={styles.radioContent}>
-                      <Text style={styles.radioLabel}>
-                        Récupérer à la gare de {deliveryData.ville_destination || '[destination]'}
-                      </Text>
-                      <Text style={styles.radioDescription}>
-                        {isAbidjanCommune(city) && deliveryData.ville_destination && !isAbidjanCommune(deliveryData.ville_destination)
-                          ? '📦 Prestation + Livreur (mairie → gare) + Expédition'
-                          : '📦 Frais de prestation + Frais d\'expédition'}
-                      </Text>
+                      <Text style={styles.radioLabel}>Se faire livrer</Text>
+                      <Text style={styles.radioDescription}>Livraison express ou expedition vers votre destination</Text>
                     </View>
                   </TouchableOpacity>
+                </View>
+              </SectionCard>
 
-                  {/* Info automatique: livreur mairie → gare d'Adjame (Abidjan → Interieur) */}
-                  {deliveryData.moyen_recuperation === 'moi_meme_gare' && isAbidjanCommune(city) && deliveryData.ville_destination && !isAbidjanCommune(deliveryData.ville_destination) && (
-                    <View style={{ marginLeft: 40, marginTop: 8 }}>
-                      <View style={{
-                        backgroundColor: '#eff6ff', borderRadius: 10, padding: 12,
-                        borderWidth: 1, borderColor: '#bfdbfe',
-                      }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#1d4ed8', marginBottom: 4 }}>
-                          Recuperation automatique par livreur
-                        </Text>
-                        <Text style={{ fontSize: 12, color: '#6b7280', lineHeight: 18 }}>
-                          Notre livreur recupere votre document a la mairie de {city} et le depose a la gare d'Adjame pour expedition vers {deliveryData.ville_destination}.
-                        </Text>
-                        {pickupToGarePrice !== null && (
-                          <View style={{
-                            backgroundColor: '#ecfdf5', borderRadius: 8, padding: 8, marginTop: 8,
-                            borderWidth: 1, borderColor: '#a7f3d0',
-                          }}>
-                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#047857' }}>
-                              Frais de recuperation : {pickupToGarePrice.toLocaleString()} FCFA
-                            </Text>
-                            <Text style={{ fontSize: 11, color: '#6b7280' }}>
-                              Distance estimee : ~{pickupToGareDistanceKm} km (mairie de {city} → gare d'Adjame)
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  )}
+              {/* Si pickup : PriceCard directement */}
+              {deliveryMode === 'pickup' && (
+                <>
+                  <Divider style={styles.divider} />
+                  {billingDetails && <PriceCard billingDetails={billingDetails} />}
+                </>
+              )}
 
-                  {/* Livraison express: masquee pour Abidjan → Interieur (pickup auto inclus dans moi_meme_gare) */}
-                  {(isAbidjanCommune(city) && deliveryData.ville_destination && !isAbidjanCommune(deliveryData.ville_destination)) ? null : (isAbidjanCommune(city) || (deliveryData.ville_destination && isAbidjanCommune(deliveryData.ville_destination))) && expressCommunesData.length > 0 && (
+              {/* Si delivery : continuer le parcours */}
+              {deliveryMode === 'delivery' && (
+                <>
+                  <Divider style={styles.divider} />
+
+                  {/* SECTION 3 : Destination */}
+                  <SectionCard title="Destination" icon="location">
+                    <TextInput
+                      label="Ville de destination *"
+                      value={deliveryData.ville_destination || ''}
+                      onChangeText={(value) => {
+                        setDeliveryData({ ...deliveryData, ville_destination: value });
+                        setSelectedExpressCommune('');
+                        setSelectedExpressSector(null);
+                      }}
+                      mode="outlined"
+                      style={styles.input}
+                      placeholder="Ex: Cocody, Abobo, Bouake..."
+                      outlineColor="#e5e7eb"
+                      activeOutlineColor="#047857"
+                    />
+                  </SectionCard>
+
+                  {/* SECTION 4 : Options contextuelles */}
+                  {deliveryScenario && (
                     <>
-                      <TouchableOpacity
-                        style={styles.radioOption}
-                        onPress={() => setDeliveryData({ ...deliveryData, moyen_recuperation: 'livraison_express' })}
-                      >
-                        <RadioButton.Android
-                          value="livraison_express"
-                          status={deliveryData.moyen_recuperation === 'livraison_express' ? 'checked' : 'unchecked'}
-                          onPress={() => setDeliveryData({ ...deliveryData, moyen_recuperation: 'livraison_express' })}
-                          color="#047857"
-                        />
-                        <View style={styles.radioContent}>
-                          <Text style={styles.radioLabel}>Livraison Express</Text>
-                          <Text style={styles.radioDescription}>
-                            {isAbidjanCommune(city) && deliveryData.ville_destination && isAbidjanCommune(deliveryData.ville_destination)
-                              ? 'Livraison directe a votre adresse a Abidjan'
-                              : isAbidjanCommune(city)
-                                ? 'Le livreur recupere a la mairie et expedie vers votre destination'
-                                : 'Livraison directe a votre adresse a Abidjan'}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
+                      <Divider style={styles.divider} />
 
-                      {/* Selection commune et secteur pour livraison express */}
-                      {deliveryData.moyen_recuperation === 'livraison_express' && expressCommunesData.length > 0 && (
-                        <View style={{ marginLeft: 40, marginTop: 8 }}>
-                          {/* Cas A: destination = commune Abidjan → dropdown commune+secteur */}
-                          {deliveryData.ville_destination && isAbidjanCommune(deliveryData.ville_destination) ? (
+                      {/* Case A: src+dest Abidjan → Express automatique */}
+                      {deliveryScenario === 'case_a' && (
+                        <SectionCard title="Livraison express" icon="flash">
+                          <Text style={styles.infoText}>
+                            Livraison express automatique - Votre document sera livre directement a votre adresse a Abidjan.
+                          </Text>
+
+                          {/* Dropdown Commune */}
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 6 }}>Commune de livraison *</Text>
+                          <TouchableOpacity
+                            style={{
+                              borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12,
+                              backgroundColor: '#fff', marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                            }}
+                            onPress={() => setShowExpressCommuneDropdown(!showExpressCommuneDropdown)}
+                          >
+                            <Text style={{ color: selectedExpressCommune ? '#111827' : '#9ca3af', fontSize: 14 }}>
+                              {selectedExpressCommune || 'Choisir une commune...'}
+                            </Text>
+                            <Ionicons name={showExpressCommuneDropdown ? 'chevron-up' : 'chevron-down'} size={18} color="#6b7280" />
+                          </TouchableOpacity>
+
+                          {showExpressCommuneDropdown && (
+                            <View style={{ backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 8, maxHeight: 200 }}>
+                              <ScrollView nestedScrollEnabled>
+                                {expressCommunesData.map((item) => (
+                                  <TouchableOpacity
+                                    key={item.commune}
+                                    style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}
+                                    onPress={() => {
+                                      setSelectedExpressCommune(item.commune);
+                                      setSelectedExpressSector(null);
+                                      setDeliveryData({ ...deliveryData, ville_destination: item.commune });
+                                      setShowExpressCommuneDropdown(false);
+                                    }}
+                                  >
+                                    <Text style={{ fontSize: 14, color: '#111827', fontWeight: selectedExpressCommune === item.commune ? '700' : '400' }}>
+                                      {item.commune} ({item.sectors.length} secteur{item.sectors.length > 1 ? 's' : ''})
+                                    </Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </ScrollView>
+                            </View>
+                          )}
+
+                          {/* Dropdown Secteur */}
+                          {selectedExpressCommune && (
                             <>
-                              {/* Dropdown Commune */}
-                              <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 6 }}>Commune de livraison *</Text>
+                              <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 6, marginTop: 4 }}>Secteur de livraison *</Text>
                               <TouchableOpacity
                                 style={{
                                   borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12,
                                   backgroundColor: '#fff', marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
                                 }}
-                                onPress={() => setShowExpressCommuneDropdown(!showExpressCommuneDropdown)}
+                                onPress={() => setShowExpressSectorDropdown(!showExpressSectorDropdown)}
                               >
-                                <Text style={{ color: selectedExpressCommune ? '#111827' : '#9ca3af', fontSize: 14 }}>
-                                  {selectedExpressCommune || 'Choisir une commune...'}
+                                <Text style={{ color: selectedExpressSector ? '#111827' : '#9ca3af', fontSize: 14 }}>
+                                  {selectedExpressSector?.name || 'Choisir un secteur...'}
                                 </Text>
-                                <Ionicons name={showExpressCommuneDropdown ? 'chevron-up' : 'chevron-down'} size={18} color="#6b7280" />
+                                <Ionicons name={showExpressSectorDropdown ? 'chevron-up' : 'chevron-down'} size={18} color="#6b7280" />
                               </TouchableOpacity>
 
-                              {showExpressCommuneDropdown && (
-                                <View style={{ backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 8, maxHeight: 200 }}>
-                                  <ScrollView nestedScrollEnabled>
-                                    {expressCommunesData.map((item) => (
+                              {showExpressSectorDropdown && (
+                                <View style={{ backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 8 }}>
+                                  {expressCommunesData
+                                    .find(c => c.commune === selectedExpressCommune)
+                                    ?.sectors.map((sector) => (
                                       <TouchableOpacity
-                                        key={item.commune}
+                                        key={sector.id}
                                         style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}
                                         onPress={() => {
-                                          setSelectedExpressCommune(item.commune);
-                                          setSelectedExpressSector(null);
-                                          setDeliveryData({ ...deliveryData, ville_destination: item.commune });
-                                          setShowExpressCommuneDropdown(false);
+                                          setSelectedExpressSector(sector);
+                                          setShowExpressSectorDropdown(false);
                                         }}
                                       >
-                                        <Text style={{ fontSize: 14, color: '#111827', fontWeight: selectedExpressCommune === item.commune ? '700' : '400' }}>
-                                          {item.commune} ({item.sectors.length} secteur{item.sectors.length > 1 ? 's' : ''})
+                                        <Text style={{ fontSize: 14, color: '#111827', fontWeight: selectedExpressSector?.id === sector.id ? '700' : '400' }}>
+                                          {sector.name}
                                         </Text>
                                       </TouchableOpacity>
                                     ))}
-                                  </ScrollView>
                                 </View>
                               )}
+                            </>
+                          )}
 
-                              {/* Dropdown Secteur */}
-                              {selectedExpressCommune && (
-                                <>
-                                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 6, marginTop: 4 }}>Secteur de livraison *</Text>
-                                  <TouchableOpacity
-                                    style={{
-                                      borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12,
-                                      backgroundColor: '#fff', marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-                                    }}
-                                    onPress={() => setShowExpressSectorDropdown(!showExpressSectorDropdown)}
-                                  >
-                                    <Text style={{ color: selectedExpressSector ? '#111827' : '#9ca3af', fontSize: 14 }}>
-                                      {selectedExpressSector?.name || 'Choisir un secteur...'}
+                          {/* Prix express dynamique */}
+                          {expressPrice !== null && selectedExpressSector && (
+                            <View style={{
+                              backgroundColor: '#ecfdf5', borderRadius: 10, padding: 12, marginTop: 4,
+                              borderWidth: 1, borderColor: '#a7f3d0',
+                            }}>
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: '#047857', marginBottom: 4 }}>
+                                Livraison express : {expressPrice.toLocaleString()} FCFA
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#6b7280' }}>
+                                Distance estimee : ~{expressDistanceKm} km (depuis la mairie de {city})
+                              </Text>
+                            </View>
+                          )}
+                        </SectionCard>
+                      )}
+
+                      {/* Case B: dest Abidjan, src intérieur → Choix express ou gare */}
+                      {deliveryScenario === 'case_b' && (
+                        <SectionCard title="Options de livraison" icon="options">
+                          <View style={styles.radioGroup}>
+                            <TouchableOpacity
+                              style={styles.radioOption}
+                              onPress={() => {
+                                setDeliveryData({ ...deliveryData, moyen_recuperation: 'livraison_express', moyen_expedition: '' });
+                                setSelectedExpressCommune('');
+                                setSelectedExpressSector(null);
+                              }}
+                            >
+                              <RadioButton.Android
+                                value="livraison_express"
+                                status={deliveryData.moyen_recuperation === 'livraison_express' ? 'checked' : 'unchecked'}
+                                onPress={() => {
+                                  setDeliveryData({ ...deliveryData, moyen_recuperation: 'livraison_express', moyen_expedition: '' });
+                                  setSelectedExpressCommune('');
+                                  setSelectedExpressSector(null);
+                                }}
+                                color="#047857"
+                              />
+                              <View style={styles.radioContent}>
+                                <Text style={styles.radioLabel}>Livraison Express</Text>
+                                <Text style={styles.radioDescription}>Livraison directe a votre adresse a Abidjan</Text>
+                              </View>
+                            </TouchableOpacity>
+
+                            {/* Express sélectionné : dropdowns commune/secteur */}
+                            {deliveryData.moyen_recuperation === 'livraison_express' && expressCommunesData.length > 0 && (
+                              <View style={{ marginLeft: 40, marginTop: 8 }}>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 6 }}>Commune de livraison *</Text>
+                                <TouchableOpacity
+                                  style={{
+                                    borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12,
+                                    backgroundColor: '#fff', marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                                  }}
+                                  onPress={() => setShowExpressCommuneDropdown(!showExpressCommuneDropdown)}
+                                >
+                                  <Text style={{ color: selectedExpressCommune ? '#111827' : '#9ca3af', fontSize: 14 }}>
+                                    {selectedExpressCommune || 'Choisir une commune...'}
+                                  </Text>
+                                  <Ionicons name={showExpressCommuneDropdown ? 'chevron-up' : 'chevron-down'} size={18} color="#6b7280" />
+                                </TouchableOpacity>
+
+                                {showExpressCommuneDropdown && (
+                                  <View style={{ backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 8, maxHeight: 200 }}>
+                                    <ScrollView nestedScrollEnabled>
+                                      {expressCommunesData.map((item) => (
+                                        <TouchableOpacity
+                                          key={item.commune}
+                                          style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}
+                                          onPress={() => {
+                                            setSelectedExpressCommune(item.commune);
+                                            setSelectedExpressSector(null);
+                                            setDeliveryData({ ...deliveryData, ville_destination: item.commune });
+                                            setShowExpressCommuneDropdown(false);
+                                          }}
+                                        >
+                                          <Text style={{ fontSize: 14, color: '#111827', fontWeight: selectedExpressCommune === item.commune ? '700' : '400' }}>
+                                            {item.commune} ({item.sectors.length} secteur{item.sectors.length > 1 ? 's' : ''})
+                                          </Text>
+                                        </TouchableOpacity>
+                                      ))}
+                                    </ScrollView>
+                                  </View>
+                                )}
+
+                                {selectedExpressCommune && (
+                                  <>
+                                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#374151', marginBottom: 6, marginTop: 4 }}>Secteur de livraison *</Text>
+                                    <TouchableOpacity
+                                      style={{
+                                        borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 12,
+                                        backgroundColor: '#fff', marginBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+                                      }}
+                                      onPress={() => setShowExpressSectorDropdown(!showExpressSectorDropdown)}
+                                    >
+                                      <Text style={{ color: selectedExpressSector ? '#111827' : '#9ca3af', fontSize: 14 }}>
+                                        {selectedExpressSector?.name || 'Choisir un secteur...'}
+                                      </Text>
+                                      <Ionicons name={showExpressSectorDropdown ? 'chevron-up' : 'chevron-down'} size={18} color="#6b7280" />
+                                    </TouchableOpacity>
+
+                                    {showExpressSectorDropdown && (
+                                      <View style={{ backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 8 }}>
+                                        {expressCommunesData
+                                          .find(c => c.commune === selectedExpressCommune)
+                                          ?.sectors.map((sector) => (
+                                            <TouchableOpacity
+                                              key={sector.id}
+                                              style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}
+                                              onPress={() => {
+                                                setSelectedExpressSector(sector);
+                                                setShowExpressSectorDropdown(false);
+                                              }}
+                                            >
+                                              <Text style={{ fontSize: 14, color: '#111827', fontWeight: selectedExpressSector?.id === sector.id ? '700' : '400' }}>
+                                                {sector.name}
+                                              </Text>
+                                            </TouchableOpacity>
+                                          ))}
+                                      </View>
+                                    )}
+                                  </>
+                                )}
+
+                                {expressPrice !== null && selectedExpressSector && (
+                                  <View style={{
+                                    backgroundColor: '#ecfdf5', borderRadius: 10, padding: 12, marginTop: 4,
+                                    borderWidth: 1, borderColor: '#a7f3d0',
+                                  }}>
+                                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#047857', marginBottom: 4 }}>
+                                      Livraison express : {expressPrice.toLocaleString()} FCFA
                                     </Text>
-                                    <Ionicons name={showExpressSectorDropdown ? 'chevron-up' : 'chevron-down'} size={18} color="#6b7280" />
-                                  </TouchableOpacity>
+                                    <Text style={{ fontSize: 11, color: '#6b7280' }}>
+                                      Distance estimee : ~{expressDistanceKm} km
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                            )}
 
-                                  {showExpressSectorDropdown && (
-                                    <View style={{ backgroundColor: '#fff', borderRadius: 8, borderWidth: 1, borderColor: '#e5e7eb', marginBottom: 8 }}>
-                                      {expressCommunesData
-                                        .find(c => c.commune === selectedExpressCommune)
-                                        ?.sectors.map((sector) => (
-                                          <TouchableOpacity
-                                            key={sector.id}
-                                            style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' }}
-                                            onPress={() => {
-                                              setSelectedExpressSector(sector);
-                                              setShowExpressSectorDropdown(false);
-                                            }}
-                                          >
-                                            <Text style={{ fontSize: 14, color: '#111827', fontWeight: selectedExpressSector?.id === sector.id ? '700' : '400' }}>
-                                              {sector.name}
-                                            </Text>
-                                          </TouchableOpacity>
-                                        ))}
+                            <TouchableOpacity
+                              style={styles.radioOption}
+                              onPress={() => {
+                                setDeliveryData({ ...deliveryData, moyen_recuperation: 'moi_meme_gare', moyen_expedition: '' });
+                                setSelectedExpressCommune('');
+                                setSelectedExpressSector(null);
+                              }}
+                            >
+                              <RadioButton.Android
+                                value="moi_meme_gare"
+                                status={deliveryData.moyen_recuperation === 'moi_meme_gare' ? 'checked' : 'unchecked'}
+                                onPress={() => {
+                                  setDeliveryData({ ...deliveryData, moyen_recuperation: 'moi_meme_gare', moyen_expedition: '' });
+                                  setSelectedExpressCommune('');
+                                  setSelectedExpressSector(null);
+                                }}
+                                color="#047857"
+                              />
+                              <View style={styles.radioContent}>
+                                <Text style={styles.radioLabel}>Recuperation a la gare</Text>
+                                <Text style={styles.radioDescription}>Frais de prestation + Frais d'expedition</Text>
+                              </View>
+                            </TouchableOpacity>
+                          </View>
+                        </SectionCard>
+                      )}
+
+                      {/* Case C: dest intérieur → Expédition obligatoire */}
+                      {deliveryScenario === 'case_c' && (
+                        <>
+                          {/* Bannière pickup auto si source = Abidjan */}
+                          {isAbidjanCommune(city) && (
+                            <SectionCard title="Recuperation automatique" icon="car">
+                              <View style={{
+                                backgroundColor: '#eff6ff', borderRadius: 10, padding: 12,
+                                borderWidth: 1, borderColor: '#bfdbfe',
+                              }}>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: '#1d4ed8', marginBottom: 4 }}>
+                                  Recuperation automatique par livreur
+                                </Text>
+                                <Text style={{ fontSize: 12, color: '#6b7280', lineHeight: 18 }}>
+                                  Notre livreur recupere votre document a la mairie de {city} et le depose a la gare d'Adjame pour expedition vers {deliveryData.ville_destination}.
+                                </Text>
+                                {pickupToGarePrice !== null && (
+                                  <View style={{
+                                    backgroundColor: '#ecfdf5', borderRadius: 8, padding: 8, marginTop: 8,
+                                    borderWidth: 1, borderColor: '#a7f3d0',
+                                  }}>
+                                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#047857' }}>
+                                      Frais de recuperation : {pickupToGarePrice.toLocaleString()} FCFA
+                                    </Text>
+                                    <Text style={{ fontSize: 11, color: '#6b7280' }}>
+                                      Distance estimee : ~{pickupToGareDistanceKm} km (mairie de {city} → gare d'Adjame)
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                            </SectionCard>
+                          )}
+                        </>
+                      )}
+
+                      {/* SECTION 5 : Mode d'expédition (quand needsExpeditionSection = true) */}
+                      {needsExpeditionSection && (
+                        <>
+                          <Divider style={styles.divider} />
+                          <SectionCard title="Mode d'expedition" icon="car">
+                            <Text style={styles.infoText}>
+                              Comment vos documents arriveront-ils ? Precisez la compagnie qui relie directement "{city}" a "{deliveryData.ville_destination || 'votre destination'}".
+                            </Text>
+
+                            <View style={styles.radioGroup}>
+                              <TouchableOpacity
+                                style={styles.radioOption}
+                                onPress={() => setDeliveryData({ ...deliveryData, moyen_expedition: 'utb' })}
+                              >
+                                <RadioButton.Android
+                                  value="utb"
+                                  status={deliveryData.moyen_expedition === 'utb' ? 'checked' : 'unchecked'}
+                                  onPress={() => setDeliveryData({ ...deliveryData, moyen_expedition: 'utb' })}
+                                  color="#047857"
+                                />
+                                <View style={styles.radioContent}>
+                                  <Text style={styles.radioLabel}>UTB (Union des Transporteurs de Bouake)</Text>
+                                  <Text style={styles.radioDescription}>Tarif fixe garanti - Reseau national fiable</Text>
+                                </View>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={styles.radioOption}
+                                onPress={() => setDeliveryData({ ...deliveryData, moyen_expedition: 'transport_classique' })}
+                              >
+                                <RadioButton.Android
+                                  value="transport_classique"
+                                  status={deliveryData.moyen_expedition === 'transport_classique' ? 'checked' : 'unchecked'}
+                                  onPress={() => setDeliveryData({ ...deliveryData, moyen_expedition: 'transport_classique' })}
+                                  color="#047857"
+                                />
+                                <View style={styles.radioContent}>
+                                  <Text style={styles.radioLabel}>Autre compagnie de transport</Text>
+                                  <Text style={styles.radioDescription}>Tarif estimatif 1000 FCFA - Ajustement possible selon disponibilite</Text>
+                                </View>
+                              </TouchableOpacity>
+
+                              {deliveryData.moyen_expedition === 'transport_classique' && (
+                                <>
+                                  <TextInput
+                                    label="Nom de la compagnie *"
+                                    value={deliveryData.preference_transport || ''}
+                                    onChangeText={(value) => setDeliveryData({ ...deliveryData, preference_transport: value })}
+                                    mode="outlined"
+                                    style={styles.input}
+                                    placeholder="Ex: SBTA, CATRANS, etc."
+                                    outlineColor="#e5e7eb"
+                                    activeOutlineColor="#047857"
+                                  />
+                                  {deliveryData.preference_transport && (
+                                    <View style={styles.warningBox}>
+                                      <Ionicons name="information-circle" size={20} color="#d97706" />
+                                      <View style={styles.warningContent}>
+                                        <Text style={styles.warningTitle}>Important</Text>
+                                        <Text style={styles.warningText}>
+                                          Le tarif affiche (1000 FCFA) est estimatif. Si <Text style={styles.warningTextBold}>{deliveryData.preference_transport}</Text> n'existe pas a <Text style={styles.warningTextBold}>{deliveryData.ville_destination || 'votre destination'}</Text> ou applique un tarif superieur, vous serez contacte pour validation et devrez completer la difference avant l'expedition.
+                                        </Text>
+                                      </View>
                                     </View>
                                   )}
                                 </>
                               )}
 
-                              {/* Affichage prix dynamique */}
-                              {expressPrice !== null && selectedExpressSector && (
-                                <View style={{
-                                  backgroundColor: '#ecfdf5', borderRadius: 10, padding: 12, marginTop: 4,
-                                  borderWidth: 1, borderColor: '#a7f3d0',
-                                }}>
-                                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#047857', marginBottom: 4 }}>
-                                    Livraison express : {expressPrice.toLocaleString()} FCFA
-                                  </Text>
-                                  <Text style={{ fontSize: 11, color: '#6b7280' }}>
-                                    Distance estimee : ~{expressDistanceKm} km (depuis la mairie de {city})
-                                  </Text>
-                                </View>
+                              {/* Expédition par Abidjan - uniquement si les 2 villes sont hors Abidjan */}
+                              {!isAbidjanCommune(city) && deliveryData.ville_destination && !isAbidjanCommune(deliveryData.ville_destination) && (
+                                <TouchableOpacity
+                                  style={styles.radioOption}
+                                  onPress={() => setDeliveryData({ ...deliveryData, moyen_expedition: 'expedition_abidjan' })}
+                                >
+                                  <RadioButton.Android
+                                    value="expedition_abidjan"
+                                    status={deliveryData.moyen_expedition === 'expedition_abidjan' ? 'checked' : 'unchecked'}
+                                    onPress={() => setDeliveryData({ ...deliveryData, moyen_expedition: 'expedition_abidjan' })}
+                                    color="#047857"
+                                  />
+                                  <View style={styles.radioContent}>
+                                    <Text style={styles.radioLabel}>Expedition par Abidjan</Text>
+                                    <Text style={styles.radioDescription}>Transit securise via la capitale - Tarif fixe</Text>
+                                  </View>
+                                </TouchableOpacity>
                               )}
-                            </>
-                          ) : isAbidjanCommune(city) && deliveryData.ville_destination && !isAbidjanCommune(deliveryData.ville_destination) ? (
-                            /* Cas B: city = Abidjan, destination = hors Abidjan → livreur recupere a la mairie et depose a la gare */
-                            <View style={{
-                              backgroundColor: '#eff6ff', borderRadius: 10, padding: 12,
-                              borderWidth: 1, borderColor: '#bfdbfe',
-                            }}>
-                              <Text style={{ fontSize: 13, fontWeight: '700', color: '#1d4ed8', marginBottom: 4 }}>
-                                Recuperation express a {city}
-                              </Text>
-                              <Text style={{ fontSize: 12, color: '#6b7280', lineHeight: 18 }}>
-                                Notre livreur recupere votre document a la mairie de {city} et le depose a la gare pour expedition vers {deliveryData.ville_destination}.
-                                Les frais d'expedition s'ajouteront ci-dessous.
-                              </Text>
                             </View>
-                          ) : null}
-                        </View>
-                      )}
-                    </>
-                  )}
-                </View>
-              </SectionCard>
-
-              {/* Moyen d'expédition (conditionnel) - pas pour express intra-Abidjan, mais oui pour express vers hors-Abidjan */}
-              {(deliveryData.moyen_recuperation === 'moi_meme_gare' ||
-                (deliveryData.moyen_recuperation === 'livraison_express' && expressCommunesData.length === 0) ||
-                (deliveryData.moyen_recuperation === 'livraison_express' && isAbidjanCommune(city) && deliveryData.ville_destination && !isAbidjanCommune(deliveryData.ville_destination))
-              ) && (
-                <>
-                  <Divider style={styles.divider} />
-                  <SectionCard title="Moyen d'expédition" icon="car">
-                    <Text style={styles.infoText}>
-                      🚛 Comment vos documents arriveront-ils ? Précisez la compagnie qui relie directement "{city}" à "{deliveryData.ville_destination || 'votre destination'}".
-                    </Text>
-
-                    <View style={styles.radioGroup}>
-                      <TouchableOpacity
-                        style={styles.radioOption}
-                        onPress={() => setDeliveryData({ ...deliveryData, moyen_expedition: 'utb' })}
-                      >
-                        <RadioButton.Android
-                          value="utb"
-                          status={deliveryData.moyen_expedition === 'utb' ? 'checked' : 'unchecked'}
-                          onPress={() => setDeliveryData({ ...deliveryData, moyen_expedition: 'utb' })}
-                          color="#047857"
-                        />
-                        <View style={styles.radioContent}>
-                          <Text style={styles.radioLabel}>🚌 UTB (Union des Transporteurs de Bouaké)</Text>
-                          <Text style={styles.radioDescription}>✓ Tarif fixe garanti - Réseau national fiable</Text>
-                        </View>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.radioOption}
-                        onPress={() => setDeliveryData({ ...deliveryData, moyen_expedition: 'transport_classique' })}
-                      >
-                        <RadioButton.Android
-                          value="transport_classique"
-                          status={deliveryData.moyen_expedition === 'transport_classique' ? 'checked' : 'unchecked'}
-                          onPress={() => setDeliveryData({ ...deliveryData, moyen_expedition: 'transport_classique' })}
-                          color="#047857"
-                        />
-                        <View style={styles.radioContent}>
-                          <Text style={styles.radioLabel}>🚐 Autre compagnie de transport</Text>
-                          <Text style={styles.radioDescription}>Tarif estimatif 1000 FCFA - Ajustement possible selon disponibilité</Text>
-                        </View>
-                      </TouchableOpacity>
-
-                      {deliveryData.moyen_expedition === 'transport_classique' && (
-                        <>
-                          <TextInput
-                            label="Nom de la compagnie *"
-                            value={deliveryData.preference_transport || ''}
-                            onChangeText={(value) => setDeliveryData({ ...deliveryData, preference_transport: value })}
-                            mode="outlined"
-                            style={styles.input}
-                            placeholder="Ex: SBTA, CATRANS, etc."
-                            outlineColor="#e5e7eb"
-                            activeOutlineColor="#047857"
-                          />
-                          {deliveryData.preference_transport && (
-                            <View style={styles.warningBox}>
-                              <Ionicons name="information-circle" size={20} color="#d97706" />
-                              <View style={styles.warningContent}>
-                                <Text style={styles.warningTitle}>Important</Text>
-                                <Text style={styles.warningText}>
-                                  Le tarif affiché (1000 FCFA) est estimatif. Si <Text style={styles.warningTextBold}>{deliveryData.preference_transport}</Text> n'existe pas à <Text style={styles.warningTextBold}>{deliveryData.ville_destination || 'votre destination'}</Text> ou applique un tarif supérieur, vous serez contacté pour validation et devrez compléter la différence avant l'expédition.
-                                </Text>
-                              </View>
-                            </View>
-                          )}
+                          </SectionCard>
                         </>
                       )}
 
-                      {/* Expédition par Abidjan - uniquement si les 2 villes sont hors Abidjan */}
-                      {!isAbidjanCommune(city) && deliveryData.ville_destination && !isAbidjanCommune(deliveryData.ville_destination) && (
-                        <TouchableOpacity
-                          style={styles.radioOption}
-                          onPress={() => setDeliveryData({ ...deliveryData, moyen_expedition: 'expedition_abidjan' })}
-                        >
-                          <RadioButton.Android
-                            value="expedition_abidjan"
-                            status={deliveryData.moyen_expedition === 'expedition_abidjan' ? 'checked' : 'unchecked'}
-                            onPress={() => setDeliveryData({ ...deliveryData, moyen_expedition: 'expedition_abidjan' })}
-                            color="#047857"
-                          />
-                          <View style={styles.radioContent}>
-                            <Text style={styles.radioLabel}>🌆 Expédition par Abidjan</Text>
-                            <Text style={styles.radioDescription}>Transit sécurisé via la capitale - Tarif fixe</Text>
-                          </View>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </SectionCard>
+                      {/* SECTION 6 : Récapitulatif */}
+                      <Divider style={styles.divider} />
+                      {billingDetails && <PriceCard billingDetails={billingDetails} />}
+                    </>
+                  )}
                 </>
               )}
-
-              <Divider style={styles.divider} />
-
-              {/* Récapitulatif final */}
-              {billingDetails && <PriceCard billingDetails={billingDetails} />}
 
               {/* Bouton de paiement */}
               <View style={styles.section}>
@@ -1257,22 +1468,22 @@ function PriceCard({ billingDetails }: { billingDetails: any }) {
         <Text style={styles.priceLabel}>{billingDetails.documents[0].document_name} ({billingDetails.documents[0].copies} copie{billingDetails.documents[0].copies > 1 ? 's' : ''})</Text>
         <Text style={styles.priceValue}>{billingDetails.payment_breakdown.documents_subtotal.toLocaleString()} FCFA</Text>
       </View>
-      <View style={styles.priceRow}>
-        <Text style={styles.priceLabel}>{billingDetails.prestation.description}</Text>
-        <Text style={styles.priceValue}>{billingDetails.payment_breakdown.prestation_fee.toLocaleString()} FCFA</Text>
-      </View>
-      {billingDetails.shipping && (
-        <View style={styles.priceRow}>
-          <Text style={styles.priceLabel}>{billingDetails.shipping.description}</Text>
-          <Text style={styles.priceValue}>{billingDetails.payment_breakdown.shipping_fee.toLocaleString()} FCFA</Text>
-        </View>
-      )}
       {billingDetails.express_delivery && (
         <View style={styles.priceRow}>
           <Text style={styles.priceLabel}>{billingDetails.express_delivery.description}</Text>
           <Text style={styles.priceValue}>{billingDetails.payment_breakdown.express_fee.toLocaleString()} FCFA</Text>
         </View>
       )}
+      {billingDetails.shipping && (
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>{billingDetails.shipping.description}</Text>
+          <Text style={styles.priceValue}>{billingDetails.payment_breakdown.shipping_fee.toLocaleString()} FCFA</Text>
+        </View>
+      )}
+      <View style={styles.priceRow}>
+        <Text style={styles.priceLabel}>{billingDetails.prestation.description}</Text>
+        <Text style={styles.priceValue}>{billingDetails.payment_breakdown.prestation_fee.toLocaleString()} FCFA</Text>
+      </View>
       <Divider style={styles.priceDivider} />
       <View style={styles.priceRow}>
         <Text style={styles.totalLabel}>Total à payer</Text>
